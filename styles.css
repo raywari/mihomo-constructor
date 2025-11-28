@@ -231,6 +231,12 @@ body.rtl .lang-menu {
   display: inline-block;
 }
 
+@media (max-width: 700px) {
+  .lang-prefix {
+    font-size: 13px;
+  }
+}
+
 .lang-name {
   font-size: 14px;
   color: var(--text);
