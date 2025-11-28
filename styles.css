@@ -94,12 +94,17 @@ body {
   flex: 0 0 auto;
   border-radius: 999px;
   border: 1px solid rgba(148, 163, 184, 0.25);
-  background: linear-gradient(90deg, rgba(77, 163, 255, 0.2), rgba(148, 163, 184, 0.12));
+  background: linear-gradient(
+    90deg,
+    rgba(77, 163, 255, 0.2),
+    rgba(148, 163, 184, 0.12)
+  );
   color: var(--text);
   font-weight: 700;
   text-decoration: none;
   white-space: nowrap;
-  transition: transform 120ms ease, border-color 120ms ease, background-color 120ms ease;
+  transition: transform 120ms ease, border-color 120ms ease,
+    background-color 120ms ease;
 }
 
 .brand-action-label {
@@ -108,7 +113,11 @@ body {
 
 .brand-action:hover {
   border-color: rgba(148, 163, 184, 0.4);
-  background: linear-gradient(90deg, rgba(77, 163, 255, 0.28), rgba(148, 163, 184, 0.16));
+  background: linear-gradient(
+    90deg,
+    rgba(77, 163, 255, 0.28),
+    rgba(148, 163, 184, 0.16)
+  );
   transform: translateY(-1px);
 }
 
@@ -728,6 +737,29 @@ pre {
 }
 .rules-toolbar .row {
   align-items: flex-start;
+}
+.match-card {
+  display: grid;
+  gap: 12px;
+}
+.match-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.match-title {
+  font-weight: 600;
+  font-size: 16px;
+}
+.match-control {
+  display: grid;
+  gap: 6px;
+  min-width: 240px;
+}
+.match-control select {
+  min-width: 240px;
 }
 .ghost {
   background: transparent;

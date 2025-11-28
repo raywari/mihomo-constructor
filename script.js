@@ -348,10 +348,16 @@ const state = {
     geoip: new Map(),
   },
   subs: [],
+  match: { mode: "auto", value: "" },
 };
 
 const GEOSITE_URL = "geo/geosite.txt";
 const GEOIP_URL = "geo/geoip.txt";
+const MATCH_AUTO_VALUE = "__auto__";
+const MATCH_POLICIES = [
+  { value: "DIRECT", label: "DIRECT — напрямую" },
+  { value: "REJECT", label: "REJECT — блокировать" },
+];
 
 function setStatus(kind, text) {
   const el = document.getElementById("status");
@@ -492,6 +498,7 @@ function renderGroups() {
     nameInp.addEventListener("input", (e) => {
       g.name = e.target.value.trim() || "GROUP";
       renderRulesTargets();
+      renderMatchSelect();
     });
     typeSel.addEventListener("change", (e) => {
       g.type = e.target.value;
@@ -518,6 +525,7 @@ function renderGroups() {
       state.groups.splice(idx, 1);
       renderGroups();
       renderRulesTargets();
+      renderMatchSelect();
     });
 
     groupsContainer.appendChild(card);
@@ -529,6 +537,7 @@ function renderGroups() {
     empty.textContent = "Пока нет групп. Нажми «Добавить группу».";
     groupsContainer.appendChild(empty);
   }
+  renderMatchSelect();
 }
 
 document.getElementById("addGroupBtn").addEventListener("click", () => {
@@ -541,6 +550,7 @@ document.getElementById("addGroupBtn").addEventListener("click", () => {
   });
   renderGroups();
   renderRulesTargets();
+  renderMatchSelect();
 });
 
 /* =========================================================
@@ -728,6 +738,84 @@ document
 document
   .getElementById("geoipSearch")
   .addEventListener("input", (e) => renderGeoipListDebounced(e.target.value));
+
+const matchSelectEl = document.getElementById("matchPolicy");
+
+function normalizeMatchSelection() {
+  if (state.match.mode === "builtin") {
+    const exists = MATCH_POLICIES.some((p) => p.value === state.match.value);
+    if (!exists) state.match = { mode: "auto", value: "" };
+  }
+  if (state.match.mode === "group") {
+    const hasGroup = state.groups.some((g) => g.name === state.match.value);
+    if (!hasGroup) state.match = { mode: "auto", value: "" };
+  }
+}
+
+function renderMatchSelect() {
+  normalizeMatchSelection();
+
+  const options = [];
+  options.push(
+    `<option value="${MATCH_AUTO_VALUE}">Авто: PROXY или DIRECT</option>`
+  );
+  options.push(
+    `<optgroup label="Спец политики">${MATCH_POLICIES.map(
+      (p) => `<option value="${p.value}">${p.label}</option>`
+    ).join("")}</optgroup>`
+  );
+  const groupOptions = state.groups
+    .map((g) => g.name)
+    .filter(Boolean)
+    .map((n) => `<option value="group:${n}">${n}</option>`)
+    .join("");
+  options.push(
+    `<optgroup label="Группы">${
+      groupOptions || '<option value="" disabled>Нет групп</option>'
+    }</optgroup>`
+  );
+
+  matchSelectEl.innerHTML = options.join("");
+
+  const currentValue =
+    state.match.mode === "group"
+      ? `group:${state.match.value}`
+      : state.match.mode === "builtin"
+      ? state.match.value
+      : MATCH_AUTO_VALUE;
+
+  const allowedValues = Array.from(matchSelectEl.options).map((o) => o.value);
+  matchSelectEl.value = allowedValues.includes(currentValue)
+    ? currentValue
+    : MATCH_AUTO_VALUE;
+}
+
+matchSelectEl.addEventListener("change", () => {
+  const v = matchSelectEl.value;
+  if (v === MATCH_AUTO_VALUE) {
+    state.match = { mode: "auto", value: "" };
+  } else if (v.startsWith("group:")) {
+    state.match = { mode: "group", value: v.slice(6) };
+  } else {
+    state.match = { mode: "builtin", value: v };
+  }
+});
+
+function getMatchPolicyTarget() {
+  normalizeMatchSelection();
+
+  if (state.match.mode === "builtin" && state.match.value)
+    return state.match.value;
+  if (state.match.mode === "group" && state.match.value) {
+    const hasGroup = state.groups.some((g) => g.name === state.match.value);
+    if (hasGroup) return state.match.value;
+  }
+
+  const proxyGroup = state.groups.find((g) => g.name === "PROXY");
+  if (proxyGroup?.name) return proxyGroup.name;
+  if (state.groups.length) return state.groups[0].name;
+  return "DIRECT";
+}
 
 function renderRulesTargets() {
   renderGeositeList(document.getElementById("geositeSearch").value);
@@ -1073,7 +1161,7 @@ document.getElementById("autoRulesBtn").addEventListener("click", () => {
     "DOMAIN-SUFFIX,xn--p1ai,DIRECT",
     "GEOSITE,category-gov-ru,DIRECT",
     "GEOIP,RU,DIRECT,no-resolve",
-    "MATCH,PROXY",
+    `MATCH,${getMatchPolicyTarget()}`,
   ];
   const yaml = "rules:\n  - " + autoRules.join("\n  - ");
   const toggle = document.getElementById("rulesAdvancedToggle");
@@ -1235,11 +1323,7 @@ function emitRulesYaml() {
   for (const [code, r] of state.rulesGeoip.entries()) {
     emitLine(lines, `- GEOIP,${code},${r.target},no-resolve`, 2);
   }
-  emitLine(
-    lines,
-    `- MATCH,${state.groups.find((g) => g.name === "PROXY")?.name || "DIRECT"}`,
-    2
-  );
+  emitLine(lines, `- MATCH,${getMatchPolicyTarget()}`, 2);
 
   return lines.join("\n") + "\n";
 }

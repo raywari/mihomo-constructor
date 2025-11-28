@@ -157,15 +157,28 @@ ss://...
 
             <div class="section">
               <div class="section-title">
-                <div class="section-heading">
-                  <div class="eyebrow">Rules</div>
-                  <h2>GEOSITE / GEOIP</h2>
-                  <div class="sub">Правила для доменных и IP списков</div>
-                </div>
+            <div class="section-heading">
+              <div class="eyebrow">Rules</div>
+              <h2>GEOSITE / GEOIP</h2>
+              <div class="sub">Правила для доменных и IP списков</div>
+            </div>
                 <div class="row" style="flex: 0 0 auto">
                   <button id="autoRulesBtn">⚙️ Автогруппа правил</button>
                 </div>
+            </div>
+
+            <div class="group-card match-card">
+              <div class="match-head">
+                <div>
+                  <div class="eyebrow">MATCH</div>
+                  <div class="match-title">Куда отправлять трафик по умолчанию</div>
+                </div>
+                <div class="match-control">
+                  <label class="hint" for="matchPolicy">Политика для последнего правила</label>
+                  <select id="matchPolicy"></select>
+                </div>
               </div>
+            </div>
 
               <div class="rules-grid">
                 <div class="group-card rules-column">
