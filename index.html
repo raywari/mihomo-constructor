@@ -1,57 +1,100 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Mihomo Constructor</title>
     <link rel="stylesheet" href="styles.css" />
-    <link rel="icon" href="favicon/favicon.svg" type="image/svg+xml" sizes="any">
-    <link rel="icon" href="favicon/favicon.ico" sizes="any">
-    <link rel="apple-touch-icon" sizes="180x180" href="favicon/apple-touch-icon.png">
-    <link rel="manifest" href="favicon/site.webmanifest">
-    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-    <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
+    <link
+      rel="icon"
+      href="favicon/favicon.svg"
+      type="image/svg+xml"
+      sizes="any"
+    />
+    <link rel="icon" href="favicon/favicon.ico" sizes="any" />
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="favicon/apple-touch-icon.png"
+    />
+    <link rel="manifest" href="favicon/site.webmanifest" />
+    <meta
+      name="theme-color"
+      content="#ffffff"
+      media="(prefers-color-scheme: light)"
+    />
+    <meta
+      name="theme-color"
+      content="#0f172a"
+      media="(prefers-color-scheme: dark)"
+    />
   </head>
   <body>
-  <header class="brand-header">
-    <div class="brand-inner">
-      <img
-        class="brand-logo"
-        src="icons/logo.svg"
-        alt="Mihomo Constructor logo"
-        width="64"
-        height="64"
-       />
-      <div class="brand-text">
-        <div class="brand-title">Mihomo Constructor</div>
-        <div class="brand-subtitle">Конструктор конфигов для Clash/Mihomo</div>
+    <header class="brand-header">
+      <div class="brand-inner">
+        <img
+          class="brand-logo"
+          src="icons/logo.svg"
+          alt="Mihomo Constructor logo"
+          width="64"
+          height="64"
+        />
+        <div class="brand-text">
+          <div class="brand-title">Mihomo Constructor</div>
+          <div class="brand-subtitle" data-i18n="brandSubtitle">
+            Config builder for Clash/Mihomo
+          </div>
+        </div>
       </div>
-    </div>
-    <a
-      class="brand-action"
-      href="https://github.com/raywari/mihomo-constructor"
-      target="_blank"
-      rel="noreferrer noopener"
-      aria-label="Открыть проект на GitHub"
-    >
-      <img
-        class="brand-action-icon"
-        src="icons/github.svg"
-        alt="GitHub"
-        width="20"
-        height="20"
-      />
-      <span class="brand-action-label">Проект на GitHub</span>
-    </a>
-  </header>
+      <div class="brand-actions">
+        <div class="lang-control">
+          <button
+            id="langButton"
+            class="lang-button"
+            type="button"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+          >
+            <span
+              class="lang-prefix"
+              aria-hidden="true"
+              data-i18n="languagePrefix"
+              >Language:</span
+            >
+            <span class="lang-current-flag" aria-hidden="true">🌐</span>
+            <span class="sr-only" data-i18n="languageLabel">Language</span>
+          </button>
+          <div id="langMenu" class="lang-menu" role="listbox"></div>
+        </div>
+        <a
+          class="brand-action"
+          href="https://github.com/raywari/mihomo-constructor"
+          target="_blank"
+          rel="noreferrer noopener"
+          aria-label="Open project on GitHub"
+          data-i18n-aria="brandActionAria"
+        >
+          <img
+            class="brand-action-icon"
+            src="icons/github.svg"
+            alt="GitHub"
+            width="20"
+            height="20"
+          />
+          <span class="brand-action-label" data-i18n="brandActionLabel"
+            >View on GitHub</span
+          >
+        </a>
+      </div>
+    </header>
     <div class="app">
       <section class="card">
         <div class="header">
           <div class="dot"></div>
           <div>
-            <h1>Конструктор</h1>
-            <div class="sub">
-              Ссылки → proxies → группы → правила → подписки
+            <h1 data-i18n="constructorTitle">Constructor</h1>
+            <div class="sub" data-i18n="constructorSub">
+              Links → proxies → groups → rules → subscriptions
             </div>
           </div>
         </div>
@@ -60,10 +103,14 @@
           <div class="stack">
             <div class="section">
               <div class="section-title">
-                <h2>Ввод ссылок</h2>
+                <h2 data-i18n="inputTitle">Input links</h2>
                 <div class="row" style="flex: 0 0 auto; max-width: 220px">
-                  <button id="pasteDemoBtn">✨ Демо</button>
-                  <button class="danger" id="clearBtn">🧹 Очистить</button>
+                  <button id="pasteDemoBtn" data-i18n="demoButton">
+                    ✨ Demo
+                  </button>
+                  <button class="danger" id="clearBtn" data-i18n="clearButton">
+                    🧹 Clear
+                  </button>
                 </div>
               </div>
 
@@ -76,13 +123,17 @@ ss://...
               ></textarea>
 
               <div class="row">
-                <button class="primary" id="convertBtn">
-                  ⚡ Собрать конфиг
+                <button
+                  class="primary"
+                  id="convertBtn"
+                  data-i18n="convertButton"
+                >
+                  ⚡ Build config
                 </button>
               </div>
 
               <div class="section-title">
-                <h2>Подписки (proxy-providers)</h2>
+                <h2 data-i18n="subsTitle">Subscriptions (proxy-providers)</h2>
               </div>
 
               <div class="group-card">
@@ -90,13 +141,19 @@ ss://...
                   <input
                     id="subsUrl"
                     type="url"
-                    placeholder="Вставьте ссылку на подписку сюда…"
+                    placeholder="Paste a subscription link here…"
+                    data-i18n="subsPlaceholder"
+                    data-i18n-attr="placeholder"
                   />
-                  <button id="addSubBtn">➕ Добавить подписку</button>
+                  <button id="addSubBtn" data-i18n="addSubButton">
+                    ➕ Add subscription
+                  </button>
                 </div>
                 <div class="hint">
-                  Proxy-providers соберутся автоматически. Можно несколько
-                  ссылок.
+                  <span data-i18n="subsHint"
+                    >Proxy providers will be created automatically. Multiple
+                    links are supported.</span
+                  >
                 </div>
                 <div
                   id="subsList"
@@ -107,8 +164,14 @@ ss://...
 
               <div class="switch-row">
                 <div>
-                  <div><b>Advanced Subscriptions (YAML)</b></div>
-                  <div class="sub">Если включено — берём YAML отсюда</div>
+                  <div>
+                    <b data-i18n="advancedSubsTitle"
+                      >Advanced Subscriptions (YAML)</b
+                    >
+                  </div>
+                  <div class="sub" data-i18n="advancedSubsHint">
+                    If enabled — YAML is taken from here
+                  </div>
                 </div>
                 <label class="switch">
                   <input type="checkbox" id="subsAdvancedToggle" />
@@ -125,9 +188,13 @@ ss://...
 
             <div class="section">
               <div class="section-title">
-                <h2>Proxy Groups</h2>
-                <button id="addGroupBtn" style="flex: 0 0 auto">
-                  ➕ Добавить группу
+                <h2 data-i18n="groupsTitle">Proxy Groups</h2>
+                <button
+                  id="addGroupBtn"
+                  style="flex: 0 0 auto"
+                  data-i18n="addGroupButton"
+                >
+                  ➕ Add group
                 </button>
               </div>
 
@@ -139,8 +206,14 @@ ss://...
 
               <div class="switch-row">
                 <div>
-                  <div><b>Advanced Groups (YAML)</b></div>
-                  <div class="sub">Если включено — используем текст ниже</div>
+                  <div>
+                    <b data-i18n="advancedGroupsTitle"
+                      >Advanced Groups (YAML)</b
+                    >
+                  </div>
+                  <div class="sub" data-i18n="advancedGroupsHint">
+                    If enabled — use the text below
+                  </div>
                 </div>
                 <label class="switch">
                   <input type="checkbox" id="groupsAdvancedToggle" />
@@ -157,45 +230,61 @@ ss://...
 
             <div class="section">
               <div class="section-title">
-            <div class="section-heading">
-              <div class="eyebrow">Rules</div>
-              <h2>GEOSITE / GEOIP</h2>
-              <div class="sub">Правила для доменных и IP списков</div>
-            </div>
+                <div class="section-heading">
+                  <div class="eyebrow">Rules</div>
+                  <h2>GEOSITE / GEOIP</h2>
+                  <div class="sub" data-i18n="rulesSubtitle">
+                    Rules for domain and IP lists
+                  </div>
+                </div>
                 <div class="row" style="flex: 0 0 auto">
-                  <button id="autoRulesBtn">⚙️ Автогруппа правил</button>
-                </div>
-            </div>
-
-            <div class="group-card match-card">
-              <div class="match-head">
-                <div>
-                  <div class="eyebrow">MATCH</div>
-                  <div class="match-title">Куда отправлять трафик по умолчанию</div>
-                </div>
-                <div class="match-control">
-                  <label class="hint" for="matchPolicy">Политика для последнего правила</label>
-                  <select id="matchPolicy"></select>
+                  <button id="autoRulesBtn" data-i18n="autoRulesButton">
+                    ⚙️ Auto rules group
+                  </button>
                 </div>
               </div>
-            </div>
+
+              <div class="group-card match-card">
+                <div class="match-head">
+                  <div>
+                    <div class="eyebrow">MATCH</div>
+                    <div class="match-title" data-i18n="matchTitle">
+                      Where to send traffic by default
+                    </div>
+                  </div>
+                  <div class="match-control">
+                    <label class="hint" for="matchPolicy" data-i18n="matchLabel"
+                      >Policy for the last rule</label
+                    >
+                    <select id="matchPolicy"></select>
+                  </div>
+                </div>
+              </div>
 
               <div class="rules-grid">
                 <div class="group-card rules-column">
                   <div class="rules-head">
                     <div class="title">
                       <div class="eyebrow">GEOSITE</div>
-                      <h2 style="margin: 0">Категории доменов</h2>
-                      <div class="sub">Файл: geosite.txt</div>
+                      <h2 style="margin: 0" data-i18n="geositeTitle">
+                        Domain categories
+                      </h2>
+                      <div class="sub" data-i18n="geositeFile">
+                        File: geosite.txt
+                      </div>
                     </div>
                     <div
                       class="row nowrap"
                       style="flex: 0 0 auto; gap: 6px; align-items: center"
                     >
-                      <button id="loadGeositeBtn" style="flex: 0 0 auto">
-                        📄 Загрузить
+                      <button
+                        id="loadGeositeBtn"
+                        style="flex: 0 0 auto"
+                        data-i18n="geositeLoadButton"
+                      >
+                        📄 Load
                       </button>
-                      <span class="pill" id="geositeStatus">не загружен</span>
+                      <span class="pill" id="geositeStatus">not loaded</span>
                     </div>
                   </div>
                   <div class="rules-toolbar">
@@ -207,15 +296,18 @@ ss://...
                         id="geositeReset"
                         class="ghost"
                         style="flex: 0 0 auto"
+                        data-i18n="resetSelection"
                       >
-                        Сбросить отмеченное
+                        Reset selected
                       </button>
                     </div>
                     <div class="row tight between" style="align-items: center">
                       <input
                         id="geositeSearch"
                         type="text"
-                        placeholder="Поиск по GEOSITE…"
+                        placeholder="Search GEOSITE…"
+                        data-i18n="geositeSearch"
+                        data-i18n-attr="placeholder"
                       />
                       <span class="pill" id="geositeCount">0</span>
                     </div>
@@ -228,17 +320,25 @@ ss://...
                   <div class="rules-head">
                     <div class="title">
                       <div class="eyebrow">GEOIP</div>
-                      <h2 style="margin: 0">Страны и сети</h2>
-                      <div class="sub">Файл: geoip.txt</div>
+                      <h2 style="margin: 0" data-i18n="geoipTitle">
+                        Countries and networks
+                      </h2>
+                      <div class="sub" data-i18n="geoipFile">
+                        File: geoip.txt
+                      </div>
                     </div>
                     <div
                       class="row nowrap"
                       style="flex: 0 0 auto; gap: 6px; align-items: center"
                     >
-                      <button id="loadGeoipBtn" style="flex: 0 0 auto">
-                        🌍 Загрузить
+                      <button
+                        id="loadGeoipBtn"
+                        style="flex: 0 0 auto"
+                        data-i18n="geoipLoadButton"
+                      >
+                        🌍 Load
                       </button>
-                      <span class="pill" id="geoipStatus">не загружен</span>
+                      <span class="pill" id="geoipStatus">not loaded</span>
                     </div>
                   </div>
                   <div class="rules-toolbar">
@@ -250,15 +350,18 @@ ss://...
                         id="geoipReset"
                         class="ghost"
                         style="flex: 0 0 auto"
+                        data-i18n="resetSelection"
                       >
-                        Сбросить отмеченное
+                        Reset selected
                       </button>
                     </div>
                     <div class="row tight between" style="align-items: center">
                       <input
                         id="geoipSearch"
                         type="text"
-                        placeholder="Поиск по GEOIP…"
+                        placeholder="Search GEOIP…"
+                        data-i18n="geoipSearch"
+                        data-i18n-attr="placeholder"
                       />
                       <span class="pill" id="geoipCount">0</span>
                     </div>
@@ -270,8 +373,14 @@ ss://...
 
               <div class="switch-row">
                 <div>
-                  <div><b>Advanced Rules + Rule-Providers (YAML)</b></div>
-                  <div class="sub">Включи чтобы вручную править</div>
+                  <div>
+                    <b data-i18n="advancedRulesTitle"
+                      >Advanced Rules + Rule-Providers (YAML)</b
+                    >
+                  </div>
+                  <div class="sub" data-i18n="advancedRulesHint">
+                    Enable to edit manually
+                  </div>
                 </div>
                 <label class="switch">
                   <input type="checkbox" id="rulesAdvancedToggle" />
@@ -284,9 +393,9 @@ ss://...
                 spellcheck="false"
                 style="display: none"
                 placeholder="rule-providers:
-  ...
-rules:
-  ..."
+   ...
+ rules:
+   ..."
               ></textarea>
             </div>
           </div>
@@ -299,31 +408,39 @@ rules:
             style="background: #7ee787; box-shadow: 0 0 12px #7ee787"
           ></div>
           <div>
-            <h1>Готовый YAML</h1>
-            <div class="sub">proxies + groups + providers + rules</div>
+            <h1 data-i18n="outputTitle">Ready YAML</h1>
+            <div class="sub" data-i18n="outputSub">
+              proxies + groups + providers + rules
+            </div>
           </div>
         </div>
 
         <div class="body">
-          <pre
-            id="output"
-          ><span style="color:#91a4b7">Жми «Собрать конфиг»…</span></pre>
+          <pre id="output" data-placeholder="true"></pre>
 
           <div class="row">
-            <button class="good" id="copyBtn">📋 Копировать</button>
-            <button id="downloadBtn">💾 Скачать config.yaml</button>
+            <button class="good" id="copyBtn" data-i18n="copyButton">
+              📋 Copy
+            </button>
+            <button id="downloadBtn" data-i18n="downloadButton">
+              💾 Download config.yaml
+            </button>
           </div>
 
           <div class="status" id="status">
-            <span class="pill">ожидаю</span><span id="statusText">—</span>
+            <span class="pill">waiting</span><span id="statusText">—</span>
           </div>
         </div>
 
         <div class="footer">
-          <div>Ctrl/Cmd + Enter — собрать.</div>
+          <div data-i18n="footerHint">Ctrl/Cmd + Enter — build.</div>
         </div>
       </section>
     </div>
+    <script src="languages/en.js"></script>
+    <script src="languages/zh.js"></script>
+    <script src="languages/fa.js"></script>
+    <script src="languages/ru.js"></script>
     <script src="script.js"></script>
   </body>
 </html>

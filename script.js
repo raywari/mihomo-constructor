@@ -94,7 +94,6 @@ function parseVmess(u) {
     } catch {
       throw new Error("Invalid vmess base64 JSON");
     }
-    // minimal поддержка
     return {
       name: cfg.ps || getNameFromFragmentOrHost(u, "vmess"),
       type: "vmess",
@@ -355,16 +354,36 @@ const GEOSITE_URL = "geo/geosite.txt";
 const GEOIP_URL = "geo/geoip.txt";
 const MATCH_AUTO_VALUE = "__auto__";
 const MATCH_POLICIES = [
-  { value: "DIRECT", label: "DIRECT — напрямую" },
-  { value: "REJECT", label: "REJECT — блокировать" },
+  { value: "DIRECT", labelKey: "matchPolicyDirect" },
+  { value: "REJECT", labelKey: "matchPolicyReject" },
 ];
 
+const translations = window.translations || {};
+const languageOptions = window.languageOptions || [];
+
+let currentLang = localStorage.getItem("lang") || "en";
+if (!translations[currentLang]) currentLang = "en";
+
+function t(key, params = {}) {
+  const dict = translations?.[currentLang] || translations?.en || {};
+
+  const template = dict[key] || translations?.en?.[key] || key;
+
+  return template.replace(/\{(\w+)\}/g, (_, k) => params[k] ?? "");
+}
+
 function setStatus(kind, text) {
+  setStatus.lastKind = kind;
+  setStatus.lastText = text;
   const el = document.getElementById("status");
   el.classList.remove("ok", "err");
   if (kind) el.classList.add(kind);
   el.querySelector(".pill").textContent =
-    kind === "ok" ? "готово" : kind === "err" ? "ошибка" : "ожидаю";
+    kind === "ok"
+      ? t("statusReady")
+      : kind === "err"
+      ? t("statusError")
+      : t("statusIdle");
   document.getElementById("statusText").textContent = text;
 }
 
@@ -443,6 +462,129 @@ function debounce(fn, delay = 250) {
   };
 }
 
+function applyTranslations() {
+  document.documentElement.lang = currentLang;
+  document.documentElement.dir = currentLang === "fa" ? "rtl" : "ltr";
+  document.body.classList.toggle("rtl", currentLang === "fa");
+
+  document.querySelectorAll("[data-i18n]").forEach((el) => {
+    const key = el.dataset.i18n;
+    const attr = el.dataset.i18nAttr;
+    if (attr) {
+      el.setAttribute(attr, t(key));
+    } else {
+      el.textContent = t(key);
+    }
+  });
+
+  document.querySelectorAll("[data-i18n-aria]").forEach((el) => {
+    const key = el.dataset.i18nAria;
+    el.setAttribute("aria-label", t(key));
+  });
+
+  syncDynamicTexts();
+}
+
+function syncDynamicTexts() {
+  const output = document.getElementById("output");
+  if (!output.textContent.trim() || output.dataset.placeholder === "true") {
+    output.textContent = t("outputPlaceholder");
+    output.dataset.placeholder = "true";
+  }
+
+  if (!state.geosite.length)
+    document.getElementById("geositeStatus").textContent = t("notLoaded");
+  if (!state.geoip.length)
+    document.getElementById("geoipStatus").textContent = t("notLoaded");
+
+  if (typeof setStatus.lastKind !== "undefined") {
+    setStatus(setStatus.lastKind, setStatus.lastText || "");
+  } else {
+    const current = document.getElementById("statusText")?.textContent || "";
+    setStatus(null, current);
+  }
+}
+
+function setupLanguageSelector() {
+  const btn = document.getElementById("langButton");
+  const menu = document.getElementById("langMenu");
+  if (!btn || !menu) return;
+
+  const renderButton = () => {
+    const opt =
+      languageOptions.find((o) => o.value === currentLang) ||
+      languageOptions[0];
+    const flag = opt?.flag || isoToFlag(opt?.value?.slice(0, 2)) || "🌐";
+    const flagEl =
+      btn.querySelector(".lang-current-flag") ||
+      btn.querySelector(".lang-flag");
+    if (flagEl) flagEl.textContent = flag;
+    btn.setAttribute(
+      "aria-label",
+      `${t("languageLabel")}: ${opt?.label || opt?.value || ""}`.trim()
+    );
+  };
+
+  const renderMenu = () => {
+    menu.innerHTML = languageOptions
+      .map(
+        (opt) => `
+          <button class="lang-option" role="option" data-value="${opt.value}">
+            <span class="lang-flag" aria-hidden="true">${
+              opt.flag || isoToFlag(opt.value.slice(0, 2)) || "🌐"
+            }</span>
+            <span class="lang-name">${opt.label}</span>
+          </button>
+        `
+      )
+      .join("");
+  };
+
+  const closeMenu = () => {
+    menu.classList.remove("open");
+    btn.setAttribute("aria-expanded", "false");
+  };
+
+  const openMenu = () => {
+    menu.classList.add("open");
+    btn.setAttribute("aria-expanded", "true");
+  };
+
+  btn.addEventListener("click", () => {
+    if (menu.classList.contains("open")) closeMenu();
+    else openMenu();
+  });
+
+  menu.addEventListener("click", (e) => {
+    const optBtn = e.target.closest(".lang-option");
+    if (!optBtn) return;
+    const lang = optBtn.dataset.value;
+    if (!translations[lang]) return;
+    currentLang = lang;
+    localStorage.setItem("lang", lang);
+    applyTranslations();
+    renderGroups();
+    renderMatchSelect();
+    renderRulesTargets();
+    renderSubs();
+    setStatus(setStatus.lastKind || null, setStatus.lastText || "");
+    renderButton();
+    closeMenu();
+  });
+
+  document.addEventListener("click", (e) => {
+    if (e.target.closest(".lang-control")) return;
+    closeMenu();
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeMenu();
+  });
+
+  renderMenu();
+  renderButton();
+}
+
 /* =========================================================
    UI: Proxy Groups
 ========================================================= */
@@ -457,7 +599,9 @@ function renderGroups() {
 
     card.innerHTML = `
       <div class="row">
-        <input type="text" placeholder="Имя группы" value="${g.name}">
+        <input type="text" placeholder="${t("groupNamePlaceholder")}" value="${
+      g.name
+    }">
         <select>
           ${["select", "url-test", "fallback", "load-balance"]
             .map(
@@ -467,18 +611,18 @@ function renderGroups() {
         </select>
       </div>
       <div class="two-col">
-        <div>
-          <label class="hint">Icon URL (необязательно)</label>
+        <div class="row">
+          <label class="hint">${t("iconLabel")}</label>
           <input type="text" placeholder="https://..." value="${g.icon || ""}">
         </div>
         <div class="row">
-          <label class="hint">Extra proxies (ручной ввод)</label>
-          <input type="text" placeholder='Напр: "🇱🇻 Latvia-1", "OTHER"' value="${(
-            g.manual || []
-          ).join(", ")}">
+          <label class="hint">${t("manualLabel")}</label>
+          <input type="text" placeholder='${t("manualPlaceholder")}' value="${(
+      g.manual || []
+    ).join(", ")}">
         </div>
       </div>
-      <div class="hint">Прокси в группе:</div>
+      <div class="hint">${t("groupProxiesHint")}</div>
       <div class="listbox" style="max-height:180px">
         ${proxyNames
           .map((n) => {
@@ -488,8 +632,8 @@ function renderGroups() {
           .join("")}
       </div>
       <div class="row" style="justify-content:space-between">
-        <div class="hint">Обновляй список после добавления новых прокси</div>
-        <button class="danger" data-del>🗑 Удалить группу</button>
+        <div class="hint">${t("updateProxyHint")}</div>
+        <button class="danger" data-del>🗑 ${t("deleteGroup")}</button>
       </div>
     `;
 
@@ -534,7 +678,7 @@ function renderGroups() {
   if (!state.groups.length) {
     const empty = document.createElement("div");
     empty.className = "hint";
-    empty.textContent = "Пока нет групп. Нажми «Добавить группу».";
+    empty.textContent = t("emptyGroups");
     groupsContainer.appendChild(empty);
   }
   renderMatchSelect();
@@ -689,7 +833,7 @@ function makeMoreBtn(container, onClick) {
   btn.className = "ghost";
   btn.style.width = "100%";
   btn.style.marginTop = "8px";
-  btn.textContent = "Показать ещё";
+  btn.textContent = t("showMore");
   btn.addEventListener("click", onClick);
   container.insertAdjacentElement("afterend", btn);
   return btn;
@@ -708,7 +852,7 @@ function updateMoreButton(virtual, btn) {
   const hasMore = virtual.hasMore();
   btn.style.display = hasMore ? "inline-flex" : "none";
   if (hasMore) {
-    btn.textContent = `Показать ещё (+${virtual.getBatchSize()})`;
+    btn.textContent = t("showMoreCount", { count: virtual.getBatchSize() });
   }
 }
 
@@ -757,11 +901,11 @@ function renderMatchSelect() {
 
   const options = [];
   options.push(
-    `<option value="${MATCH_AUTO_VALUE}">Авто: PROXY или DIRECT</option>`
+    `<option value="${MATCH_AUTO_VALUE}">${t("matchAuto")}</option>`
   );
   options.push(
-    `<optgroup label="Спец политики">${MATCH_POLICIES.map(
-      (p) => `<option value="${p.value}">${p.label}</option>`
+    `<optgroup label="${t("matchSpecialPolicies")}">${MATCH_POLICIES.map(
+      (p) => `<option value="${p.value}">${t(p.labelKey)}</option>`
     ).join("")}</optgroup>`
   );
   const groupOptions = state.groups
@@ -770,8 +914,8 @@ function renderMatchSelect() {
     .map((n) => `<option value="group:${n}">${n}</option>`)
     .join("");
   options.push(
-    `<optgroup label="Группы">${
-      groupOptions || '<option value="" disabled>Нет групп</option>'
+    `<optgroup label="${t("groupsTitle")}">${
+      groupOptions || `<option value="" disabled>${t("noGroups")}</option>`
     }</optgroup>`
   );
 
@@ -841,13 +985,15 @@ function makeRuleRow(kind, name, pretty, query = "") {
     </div>
     <div class="rule-actions">
       <select data-action>
-        <option value="">— действие для правила —</option>
+        <option value="">${t("ruleActionPlaceholder")}</option>
         <option value="DIRECT">DIRECT</option>
-        <option value="PROXY">PROXY (группа)</option>
+        <option value="PROXY">${t("ruleActionProxy")}</option>
         <option value="BLOCK">BLOCK</option>
       </select>
       <select data-target class="target-select is-hidden"></select>
-      <button class="icon-btn" data-clear title="Сбросить">✕</button>
+      <button class="icon-btn" data-clear title="${t(
+        "ruleClearTitle"
+      )}">✕</button>
     </div>
   `;
 
@@ -857,7 +1003,9 @@ function makeRuleRow(kind, name, pretty, query = "") {
   function syncTargets(selectedTarget) {
     const targets = state.groups.map((g) => g.name).filter(Boolean);
     if (!targets.length) {
-      targetSel.innerHTML = `<option value="" disabled selected>Нет групп</option>`;
+      targetSel.innerHTML = `<option value="" disabled selected>${t(
+        "noGroups"
+      )}</option>`;
       targetSel.value = "";
       return;
     }
@@ -908,7 +1056,7 @@ function makeRuleRow(kind, name, pretty, query = "") {
     syncTargets(targetSel.value);
     const tgt = targetSel.value;
     if (!tgt) {
-      setStatus("err", "Выбери группу для PROXY");
+      setStatus("err", t("selectProxyGroup"));
       actionSel.value = "";
       map.delete(name);
       renderRulesTargets();
@@ -937,11 +1085,11 @@ function makeRuleRow(kind, name, pretty, query = "") {
 
     const prepared = getPreparedAction();
     if (!prepared.action) {
-      setStatus("err", "Выбери действие для правила");
+      setStatus("err", t("selectRuleAction"));
       return;
     }
     if (prepared.action === "PROXY" && !prepared.target) {
-      setStatus("err", "Выбери группу для PROXY");
+      setStatus("err", t("selectProxyGroup"));
       return;
     }
 
@@ -965,7 +1113,6 @@ function makeRuleRow(kind, name, pretty, query = "") {
     applyToActive();
   });
   row.addEventListener("click", (e) => {
-    // не перехватываем клики по контролам внутри строки
     if (
       e.target.tagName === "SELECT" ||
       e.target.closest("select") ||
@@ -988,7 +1135,6 @@ function makeRuleRow(kind, name, pretty, query = "") {
 function renderGeositeList(filter = "") {
   const trimmed = filter.trim();
 
-  // скроллим в начало только если строка поиска реально изменилась
   const filterChanged = trimmed !== geositeFilterRaw;
   geositeFilterRaw = trimmed;
 
@@ -1000,8 +1146,7 @@ function renderGeositeList(filter = "") {
     geositeCountEl.textContent = "0";
     const empty = document.createElement("div");
     empty.className = "empty-state";
-    empty.innerHTML =
-      "Файл не загружен. Нажми «Загрузить» выше, чтобы увидеть правила.";
+    empty.innerHTML = t("fileNotLoaded");
     geositeVirtual.showMessage(empty);
     updateMoreButton(geositeVirtual, geositeMoreBtn);
     return;
@@ -1014,7 +1159,7 @@ function renderGeositeList(filter = "") {
   if (!items.length) {
     const empty = document.createElement("div");
     empty.className = "empty-state";
-    empty.textContent = `Нет совпадений по «${geositeFilterRaw || ""}».`;
+    empty.textContent = t("noMatches", { query: geositeFilterRaw || "" });
     geositeVirtual.showMessage(empty);
     updateMoreButton(geositeVirtual, geositeMoreBtn);
     return;
@@ -1028,7 +1173,6 @@ function renderGeositeList(filter = "") {
 function renderGeoipList(filter = "") {
   const trimmed = filter.trim();
 
-  // скроллим в начало только если строка поиска реально изменилась
   const filterChanged = trimmed !== geoipFilterRaw;
   geoipFilterRaw = trimmed;
 
@@ -1040,8 +1184,7 @@ function renderGeoipList(filter = "") {
     geoipCountEl.textContent = "0";
     const empty = document.createElement("div");
     empty.className = "empty-state";
-    empty.innerHTML =
-      "Файл не загружен. Нажми «Загрузить» выше, чтобы увидеть правила.";
+    empty.innerHTML = t("fileNotLoaded");
     geoipVirtual.showMessage(empty);
     updateMoreButton(geoipVirtual, geoipMoreBtn);
     return;
@@ -1054,7 +1197,7 @@ function renderGeoipList(filter = "") {
   if (!items.length) {
     const empty = document.createElement("div");
     empty.className = "empty-state";
-    empty.textContent = `Нет совпадений по «${geoipFilterRaw || ""}».`;
+    empty.textContent = t("noMatches", { query: geoipFilterRaw || "" });
     geoipVirtual.showMessage(empty);
     updateMoreButton(geoipVirtual, geoipMoreBtn);
     return;
@@ -1074,12 +1217,12 @@ function updateGeoStatus(statusEl, received, total, count) {
     const pct = Math.min(100, Math.round((received / total) * 100));
     if (Number.isFinite(pct)) parts.push(`${pct}%`);
   } else if (received) {
-    parts.push(`${Math.round(received / 1024)} кБ`);
+    parts.push(`${Math.round(received / 1024)} ${t("kb")}`);
   }
   if (typeof count === "number") parts.push(`${count}`);
   statusEl.textContent = parts.length
-    ? `загружаю… ${parts.join(" • ")}`
-    : "загружаю…";
+    ? t("loadingLong", { details: parts.join(" • ") })
+    : t("loadingShort");
 }
 
 function loadGeo(kind) {
@@ -1091,7 +1234,7 @@ function loadGeo(kind) {
   const label = isGeosite ? "GEOSITE" : "GEOIP";
 
   stateArr.length = 0;
-  statusEl.textContent = "загружаю…";
+  statusEl.textContent = t("loadingShort");
 
   const worker = new Worker("geo-worker.js");
 
@@ -1103,20 +1246,20 @@ function loadGeo(kind) {
     }
     if (data.type === "done") {
       statusEl.textContent = `OK: ${stateArr.length}`;
-      setStatus("ok", `${label} загружен: ${stateArr.length}`);
+      setStatus("ok", t("geoLoaded", { label, count: stateArr.length }));
       renderFn("");
       worker.terminate();
       return;
     }
     if (data.type === "error") {
-      statusEl.textContent = "ошибка";
-      setStatus("err", data.message || "Ошибка загрузки");
+      statusEl.textContent = t("statusError");
+      setStatus("err", data.message || t("geoLoadError"));
       worker.terminate();
     }
   };
 
   worker.onerror = (e) => {
-    statusEl.textContent = "ошибка";
+    statusEl.textContent = t("statusError");
     setStatus("err", e.message || String(e));
     worker.terminate();
   };
@@ -1132,7 +1275,6 @@ document
   .getElementById("loadGeoipBtn")
   .addEventListener("click", () => loadGeo("geoip"));
 
-// Автогруппа правил
 document.getElementById("autoRulesBtn").addEventListener("click", () => {
   const autoRules = [
     "GEOIP,private,DIRECT,no-resolve",
@@ -1171,7 +1313,7 @@ document.getElementById("autoRulesBtn").addEventListener("click", () => {
     toggle.checked = true;
     toggle.dispatchEvent(new Event("change"));
   }
-  setStatus("ok", "Автогруппа правил вставлена в Advanced Rules");
+  setStatus("ok", t("autoRulesInserted"));
 });
 
 /* =========================================================
@@ -1188,7 +1330,9 @@ function renderSubs() {
         <div><b>${s.name}</b></div>
         <small>${s.url}</small>
       </div>
-      <button class="danger" data-del style="flex:0 0 auto">Удалить</button>
+      <button class="danger" data-del style="flex:0 0 auto">${t(
+        "delete"
+      )}</button>
     `;
     row.querySelector("[data-del]").addEventListener("click", () => {
       state.subs.splice(idx, 1);
@@ -1200,7 +1344,7 @@ function renderSubs() {
   if (!state.subs.length) {
     const empty = document.createElement("div");
     empty.className = "hint";
-    empty.textContent = "Пока нет подписок.";
+    empty.textContent = t("noSubs");
     subsListEl.appendChild(empty);
   }
 }
@@ -1256,7 +1400,6 @@ function ensureAutoProxyGroup() {
   }
 
   const allProxyNames = state.proxies.map((p) => p.name);
-  // оставляем только актуальные + добавляем новые
   const prevProxies = (g.proxies || []).filter((n) =>
     allProxyNames.includes(n)
   );
@@ -1276,8 +1419,6 @@ function emitGroupsYaml() {
     return document.getElementById("groupsAdvancedText").value.trim() + "\n";
   }
 
-  // если юзер сам групп не создавал, но есть прокси/подписки —
-  // делаем автогруппу PROXY
   if (!state.groups.length && (state.proxies.length || state.subs.length)) {
     ensureAutoProxyGroup();
   }
@@ -1292,14 +1433,12 @@ function emitGroupsYaml() {
     emitLine(lines, "  type: " + g.type, 0);
     if (g.icon) emitLine(lines, "  icon: " + g.icon, 0);
 
-    // все прокси (отмеченные + вручную дописанные)
     const list = uniq([...(g.proxies || []), ...(g.manual || [])]);
     if (list.length) {
       emitLine(lines, "  proxies:", 0);
       list.forEach((pn) => emitLine(lines, "  - " + yamlQuote(pn), 0));
     }
 
-    // подписки, если есть (автоматически подцепляем при ensureAutoProxyGroup)
     if (g.useSubs && g.useSubs.length) {
       emitLine(lines, "  use:", 0);
       g.useSubs.forEach((sn) => emitLine(lines, "  - " + yamlQuote(sn), 0));
@@ -1363,9 +1502,7 @@ function rebuildInternalState() {
     for (const u of urls) {
       try {
         proxies.push(parseOne(u));
-      } catch {
-        /* тихо игнорим ошибки, без статуса */
-      }
+      } catch {}
     }
   }
   state.proxies = proxies;
@@ -1373,7 +1510,6 @@ function rebuildInternalState() {
   ensureAutoProxyGroup();
   renderGroups();
   renderRulesTargets();
-  // ВАЖНО: не трогаем output и setStatus — это “внутренняя” сборка
 }
 
 function buildConfig() {
@@ -1412,28 +1548,36 @@ function buildConfig() {
   if (rulesYaml) yaml += (yaml ? "\n" : "") + rulesYaml.trim() + "\n";
 
   if (!yaml.trim()) {
-    document.getElementById("output").textContent =
-      "Нечего собирать: нет ссылок, подписок и advanced-секций.";
-    setStatus("err", "пусто");
+    document.getElementById("output").textContent = t("nothingToBuild");
+    setStatus("err", t("emptyStatus"));
     return;
   }
 
-  document.getElementById("output").textContent = yaml;
+  const outputEl = document.getElementById("output");
+  outputEl.textContent = yaml;
+  delete outputEl.dataset.placeholder;
 
   if (errors.length) {
-    setStatus("err", `прокси: ${proxies.length}, ошибок: ${errors.length}`);
+    setStatus(
+      "err",
+      t("errorSummary", { proxies: proxies.length, errors: errors.length })
+    );
   } else {
     const parts = [
-      proxies.length ? `proxies ${proxies.length}` : null,
-      state.subs.length ? `subs ${state.subs.length}` : null,
-      state.groups.length ? `groups ${state.groups.length}` : null,
+      proxies.length ? t("countProxies", { count: proxies.length }) : null,
+      state.subs.length ? t("countSubs", { count: state.subs.length }) : null,
+      state.groups.length
+        ? t("countGroups", { count: state.groups.length })
+        : null,
       state.rulesGeosite.size + state.rulesGeoip.size
-        ? `rules ${state.rulesGeosite.size + state.rulesGeoip.size}`
+        ? t("countRules", {
+            count: state.rulesGeosite.size + state.rulesGeoip.size,
+          })
         : null,
     ]
       .filter(Boolean)
       .join(", ");
-    setStatus("ok", `готово: ${parts || "advanced-only"}`);
+    setStatus("ok", t("buildSummary", { parts: parts || t("advancedOnly") }));
   }
 }
 
@@ -1448,25 +1592,25 @@ document.getElementById("pasteDemoBtn").addEventListener("click", () => {
     "trojan://password@trojan.example.com:443?sni=example.com#TROJAN_TLS",
     "ss://YWVzLTI1Ni1nY206cGFzc3dvcmQ=@ss.example.com:8388#SHADOWSOCKS",
   ].join("\n");
-  setStatus(null, "вставил демо");
+  setStatus(null, t("demoStatus"));
 });
 
 document.getElementById("clearBtn").addEventListener("click", () => {
   document.getElementById("input").value = "";
   document.getElementById("output").textContent = "";
-  setStatus(null, "очищено");
+  setStatus(null, t("clearedStatus"));
 });
 
 /* copy/download */
 document.getElementById("copyBtn").addEventListener("click", async () => {
   const text = document.getElementById("output").textContent.trim();
   if (!text) {
-    setStatus("err", "нечего копировать");
+    setStatus("err", t("nothingToCopy"));
     return;
   }
   try {
     await navigator.clipboard.writeText(text);
-    setStatus("ok", "скопировано");
+    setStatus("ok", t("copied"));
   } catch {
     const ta = document.createElement("textarea");
     ta.value = text;
@@ -1474,13 +1618,13 @@ document.getElementById("copyBtn").addEventListener("click", async () => {
     ta.select();
     document.execCommand("copy");
     document.body.removeChild(ta);
-    setStatus("ok", "скопировано (fallback)");
+    setStatus("ok", t("copiedFallback"));
   }
 });
 document.getElementById("downloadBtn").addEventListener("click", () => {
   const text = document.getElementById("output").textContent.trim();
   if (!text) {
-    setStatus("err", "нечего скачивать");
+    setStatus("err", t("nothingToDownload"));
     return;
   }
   const blob = new Blob([text], { type: "text/yaml;charset=utf-8" });
@@ -1492,7 +1636,7 @@ document.getElementById("downloadBtn").addEventListener("click", () => {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  setStatus("ok", "скачано");
+  setStatus("ok", t("downloaded"));
 });
 
 /* hotkey */
@@ -1503,6 +1647,20 @@ document.getElementById("input").addEventListener("input", () => {
   rebuildInternalStateDebounced();
 });
 
-/* initial render */
-renderGroups();
-renderSubs();
+/* =========================================================
+   Initial render + language init
+========================================================= */
+
+function initApp() {
+  setupLanguageSelector();
+  applyTranslations();
+  renderSubs();
+  renderGroups();
+  renderRulesTargets();
+  syncDynamicTexts();
+}
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initApp);
+} else {
+  initApp();
+}
