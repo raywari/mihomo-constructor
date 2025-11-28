@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mihomo Constructor</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="icon" href="favicon/favicon.svg" type="image/svg+xml" sizes="any">
+    <link rel="icon" href="favicon/favicon.ico" sizes="any">
+    <link rel="apple-touch-icon" sizes="180x180" href="favicon/apple-touch-icon.png">
+    <link rel="manifest" href="favicon/site.webmanifest">
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
+  </head>
+  <body>
+  <header class="brand-header">
+    <div class="brand-inner">
+      <img
+        class="brand-logo"
+        src="icons/logo.svg"
+        alt="Mihomo Constructor logo"
+        width="64"
+        height="64"
+       />
+      <div class="brand-text">
+        <div class="brand-title">Mihomo Constructor</div>
+        <div class="brand-subtitle">Конструктор конфигов для Clash/Mihomo</div>
+      </div>
+    </div>
+    <a
+      class="brand-action"
+      href="https://github.com/raywari/mihomo-constructor"
+      target="_blank"
+      rel="noreferrer noopener"
+      aria-label="Открыть проект на GitHub"
+    >
+      <img
+        class="brand-action-icon"
+        src="icons/github.svg"
+        alt="GitHub"
+        width="20"
+        height="20"
+      />
+      <span class="brand-action-label">Проект на GitHub</span>
+    </a>
+  </header>
+    <div class="app">
+      <section class="card">
+        <div class="header">
+          <div class="dot"></div>
+          <div>
+            <h1>Конструктор</h1>
+            <div class="sub">
+              Ссылки → proxies → группы → правила → подписки
+            </div>
+          </div>
+        </div>
+
+        <div class="body">
+          <div class="stack">
+            <div class="section">
+              <div class="section-title">
+                <h2>Ввод ссылок</h2>
+                <div class="row" style="flex: 0 0 auto; max-width: 220px">
+                  <button id="pasteDemoBtn">✨ Демо</button>
+                  <button class="danger" id="clearBtn">🧹 Очистить</button>
+                </div>
+              </div>
+
+              <textarea
+                id="input"
+                placeholder="vless://...
+vmess://...
+ss://...
+..."
+              ></textarea>
+
+              <div class="row">
+                <button class="primary" id="convertBtn">
+                  ⚡ Собрать конфиг
+                </button>
+              </div>
+
+              <div class="section-title">
+                <h2>Подписки (proxy-providers)</h2>
+              </div>
+
+              <div class="group-card">
+                <div class="row">
+                  <input
+                    id="subsUrl"
+                    type="url"
+                    placeholder="Вставьте ссылку на подписку сюда…"
+                  />
+                  <button id="addSubBtn">➕ Добавить подписку</button>
+                </div>
+                <div class="hint">
+                  Proxy-providers соберутся автоматически. Можно несколько
+                  ссылок.
+                </div>
+                <div
+                  id="subsList"
+                  class="listbox"
+                  style="max-height: 160px"
+                ></div>
+              </div>
+
+              <div class="switch-row">
+                <div>
+                  <div><b>Advanced Subscriptions (YAML)</b></div>
+                  <div class="sub">Если включено — берём YAML отсюда</div>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="subsAdvancedToggle" />
+                  <div class="track"><div class="thumb"></div></div>
+                </label>
+              </div>
+              <textarea
+                id="subsAdvancedText"
+                class="small"
+                spellcheck="false"
+                style="display: none"
+              ></textarea>
+            </div>
+
+            <div class="section">
+              <div class="section-title">
+                <h2>Proxy Groups</h2>
+                <button id="addGroupBtn" style="flex: 0 0 auto">
+                  ➕ Добавить группу
+                </button>
+              </div>
+
+              <div
+                id="groupsContainer"
+                class="body"
+                style="padding: 0; gap: 10px"
+              ></div>
+
+              <div class="switch-row">
+                <div>
+                  <div><b>Advanced Groups (YAML)</b></div>
+                  <div class="sub">Если включено — используем текст ниже</div>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="groupsAdvancedToggle" />
+                  <div class="track"><div class="thumb"></div></div>
+                </label>
+              </div>
+              <textarea
+                id="groupsAdvancedText"
+                class="small"
+                spellcheck="false"
+                style="display: none"
+              ></textarea>
+            </div>
+
+            <div class="section">
+              <div class="section-title">
+                <div class="section-heading">
+                  <div class="eyebrow">Rules</div>
+                  <h2>GEOSITE / GEOIP</h2>
+                  <div class="sub">Правила для доменных и IP списков</div>
+                </div>
+                <div class="row" style="flex: 0 0 auto">
+                  <button id="autoRulesBtn">⚙️ Автогруппа правил</button>
+                </div>
+              </div>
+
+              <div class="rules-grid">
+                <div class="group-card rules-column">
+                  <div class="rules-head">
+                    <div class="title">
+                      <div class="eyebrow">GEOSITE</div>
+                      <h2 style="margin: 0">Категории доменов</h2>
+                      <div class="sub">Файл: geosite.txt</div>
+                    </div>
+                    <div
+                      class="row nowrap"
+                      style="flex: 0 0 auto; gap: 6px; align-items: center"
+                    >
+                      <button id="loadGeositeBtn" style="flex: 0 0 auto">
+                        📄 Загрузить
+                      </button>
+                      <span class="pill" id="geositeStatus">не загружен</span>
+                    </div>
+                  </div>
+                  <div class="rules-toolbar">
+                    <div
+                      class="row between"
+                      style="align-items: flex-end; gap: 10px; flex-wrap: wrap"
+                    >
+                      <button
+                        id="geositeReset"
+                        class="ghost"
+                        style="flex: 0 0 auto"
+                      >
+                        Сбросить отмеченное
+                      </button>
+                    </div>
+                    <div class="row tight between" style="align-items: center">
+                      <input
+                        id="geositeSearch"
+                        type="text"
+                        placeholder="Поиск по GEOSITE…"
+                      />
+                      <span class="pill" id="geositeCount">0</span>
+                    </div>
+                  </div>
+
+                  <div id="geositeList" class="listbox"></div>
+                </div>
+
+                <div class="group-card rules-column">
+                  <div class="rules-head">
+                    <div class="title">
+                      <div class="eyebrow">GEOIP</div>
+                      <h2 style="margin: 0">Страны и сети</h2>
+                      <div class="sub">Файл: geoip.txt</div>
+                    </div>
+                    <div
+                      class="row nowrap"
+                      style="flex: 0 0 auto; gap: 6px; align-items: center"
+                    >
+                      <button id="loadGeoipBtn" style="flex: 0 0 auto">
+                        🌍 Загрузить
+                      </button>
+                      <span class="pill" id="geoipStatus">не загружен</span>
+                    </div>
+                  </div>
+                  <div class="rules-toolbar">
+                    <div
+                      class="row between"
+                      style="align-items: flex-end; gap: 10px; flex-wrap: wrap"
+                    >
+                      <button
+                        id="geoipReset"
+                        class="ghost"
+                        style="flex: 0 0 auto"
+                      >
+                        Сбросить отмеченное
+                      </button>
+                    </div>
+                    <div class="row tight between" style="align-items: center">
+                      <input
+                        id="geoipSearch"
+                        type="text"
+                        placeholder="Поиск по GEOIP…"
+                      />
+                      <span class="pill" id="geoipCount">0</span>
+                    </div>
+                  </div>
+
+                  <div id="geoipList" class="listbox"></div>
+                </div>
+              </div>
+
+              <div class="switch-row">
+                <div>
+                  <div><b>Advanced Rules + Rule-Providers (YAML)</b></div>
+                  <div class="sub">Включи чтобы вручную править</div>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="rulesAdvancedToggle" />
+                  <div class="track"><div class="thumb"></div></div>
+                </label>
+              </div>
+              <textarea
+                id="rulesAdvancedText"
+                class="small"
+                spellcheck="false"
+                style="display: none"
+                placeholder="rule-providers:
+  ...
+rules:
+  ..."
+              ></textarea>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section class="card">
+        <div class="header header-secondary">
+          <div
+            class="dot"
+            style="background: #7ee787; box-shadow: 0 0 12px #7ee787"
+          ></div>
+          <div>
+            <h1>Готовый YAML</h1>
+            <div class="sub">proxies + groups + providers + rules</div>
+          </div>
+        </div>
+
+        <div class="body">
+          <pre
+            id="output"
+          ><span style="color:#91a4b7">Жми «Собрать конфиг»…</span></pre>
+
+          <div class="row">
+            <button class="good" id="copyBtn">📋 Копировать</button>
+            <button id="downloadBtn">💾 Скачать config.yaml</button>
+          </div>
+
+          <div class="status" id="status">
+            <span class="pill">ожидаю</span><span id="statusText">—</span>
+          </div>
+        </div>
+
+        <div class="footer">
+          <div>Ctrl/Cmd + Enter — собрать.</div>
+        </div>
+      </section>
+    </div>
+    <script src="script.js"></script>
+  </body>
+</html>
