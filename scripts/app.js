@@ -1,34 +1,35 @@
-function b64decodeAuto(data) {
-  if (!data) return "";
-  data = data.replace(/-/g, "+").replace(/_/g, "/");
-  const pad = (4 - (data.length % 4)) % 4;
-  data += "=".repeat(pad);
+function resolveParser() {
   try {
-    const bin = atob(data);
-    const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
-    return new TextDecoder("utf-8", { fatal: false }).decode(bytes);
-  } catch {
-    return "";
-  }
+    if (typeof window !== "undefined" && window.parser) return window.parser;
+    if (typeof parser !== "undefined") return parser;
+  } catch {}
+  return null;
 }
 function yamlQuote(s) {
   if (s == null) return null;
-  s = String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  s = String(s)
+    .replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, "")
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"');
   return `"${s}"`;
 }
+
 function emitLine(lines, text = "", indent = 0) {
   lines.push(" ".repeat(indent) + text);
 }
 function emitKv(lines, key, value, indent = 0, quote = true) {
-  if (value == null || value === "") return;
+  if (value == null || (value === "" && key !== "password")) return;
+
   if (typeof value === "boolean") {
     emitLine(lines, `${key}: ${value ? "true" : "false"}`, indent);
     return;
   }
+
   let v = value;
   if (quote && typeof v !== "number") v = yamlQuote(v);
   emitLine(lines, `${key}: ${v}`, indent);
 }
+
 function emitBool(lines, key, flag, indent = 0) {
   if (flag == null) return;
   emitLine(lines, `${key}: ${flag ? "true" : "false"}`, indent);
@@ -38,249 +39,7 @@ function emitList(lines, key, items, indent = 0) {
   emitLine(lines, `${key}:`, indent);
   for (const it of items) emitLine(lines, `- ${yamlQuote(it)}`, indent + 2);
 }
-function parsedQs(u) {
-  const o = {};
-  u.searchParams.forEach((v, k) => (o[k] = v));
-  return o;
-}
-function getNameFromFragmentOrHost(u, fb) {
-  if (u.hash && u.hash.length > 1) {
-    try {
-      return decodeURIComponent(u.hash.slice(1));
-    } catch {
-      return u.hash.slice(1);
-    }
-  }
-  return u.hostname || fb;
-}
 
-function parseVless(u) {
-  const q = parsedQs(u);
-  const name = getNameFromFragmentOrHost(u, "vless");
-  const p = {
-    name,
-    type: "vless",
-    server: u.hostname,
-    port: u.port ? Number(u.port) : null,
-    uuid: u.username || "",
-    network: q.type || "tcp",
-    udp: true,
-  };
-  const sec = q.security || "";
-  if (sec === "reality") {
-    p.tls = true;
-    p["reality-opts"] = { "public-key": q.pbk || "", "short-id": q.sid || "" };
-  } else if (sec === "tls") {
-    p.tls = true;
-  }
-  if (q.flow) p.flow = q.flow;
-  if (q.sni) p.servername = q.sni;
-  if (q.fp) p["client-fingerprint"] = q.fp;
-  if (q.type === "ws") {
-    const ws = { path: q.path ? decodeURIComponent(q.path) : "" };
-    if (q.host) ws.headers = { Host: q.host };
-    p["ws-opts"] = ws;
-  }
-  return p;
-}
-function parseVmess(u) {
-  const rest = (u.host || "") + (u.pathname || "");
-  if (!rest.includes("@") && !u.search) {
-    // vmess://BASE64(JSON)
-    const decoded = b64decodeAuto(rest);
-    let cfg;
-    try {
-      cfg = JSON.parse(decoded);
-    } catch {
-      throw new Error("Invalid vmess base64 JSON");
-    }
-    return {
-      name: cfg.ps || getNameFromFragmentOrHost(u, "vmess"),
-      type: "vmess",
-      server: cfg.add,
-      port: Number(cfg.port),
-      uuid: cfg.id,
-      cipher: "auto",
-      network: cfg.net || "tcp",
-      tls: cfg.tls === "tls",
-      udp: true,
-    };
-  }
-  const q = parsedQs(u);
-  const name = getNameFromFragmentOrHost(u, "vmess");
-  const p = {
-    name,
-    type: "vmess",
-    server: u.hostname,
-    port: u.port ? Number(u.port) : null,
-    uuid: u.username || "",
-    cipher: "auto",
-    network: q.type || "tcp",
-    udp: true,
-  };
-  if (q.security === "tls") p.tls = true;
-  if (q.sni) p.servername = q.sni;
-  if (p.network === "ws") {
-    const ws = { path: q.path ? decodeURIComponent(q.path) : "" };
-    if (q.host) ws.headers = { Host: q.host };
-    p["ws-opts"] = ws;
-  }
-  return p;
-}
-function parseSs(u) {
-  const rest = (u.host || "") + (u.pathname || "");
-  const nameFrag = getNameFromFragmentOrHost(u, "ss");
-  let method = null,
-    password = null,
-    host = null,
-    port = null;
-  if (!rest.includes("@")) {
-    const decoded = b64decodeAuto(rest);
-    if (decoded.includes("@") && decoded.includes(":")) {
-      const [userinfo, hostinfo] = decoded.split("@", 2);
-      if (userinfo.includes(":")) [method, password] = userinfo.split(":", 2);
-      if (hostinfo.includes(":")) [host, port] = hostinfo.split(":", 2);
-    } else {
-      if (decoded.includes(":")) [method, password] = decoded.split(":", 2);
-      else {
-        method = decoded;
-        password = "";
-      }
-    }
-  } else {
-    if (u.username && u.username.includes(":"))
-      [method, password] = u.username.split(":", 2);
-    else method = u.username || "";
-    host = u.hostname;
-    port = u.port || null;
-  }
-  const q = parsedQs(u);
-  const p = {
-    name: nameFrag !== "ss" ? nameFrag : host || "ss",
-    type: "ss",
-    server: host,
-    port: port != null && /^\d+$/.test(String(port)) ? Number(port) : port,
-    cipher: method,
-    password,
-    udp: true,
-  };
-  if (q.plugin) {
-    p.plugin = q.plugin;
-    const parts = q.plugin.split(";");
-    if (parts.length > 1) {
-      const popt = {};
-      for (const x of parts.slice(1)) {
-        if (!x) continue;
-        if (x.includes("=")) {
-          const [k, v] = x.split("=", 2);
-          popt[k] = v;
-        } else popt[x] = "true";
-      }
-      if (Object.keys(popt).length) p["plugin-opts"] = popt;
-    }
-  }
-  return p;
-}
-function parseTrojan(u) {
-  const q = parsedQs(u);
-  const name = getNameFromFragmentOrHost(u, "trojan");
-  const p = {
-    name,
-    type: "trojan",
-    server: u.hostname,
-    port: u.port ? Number(u.port) : null,
-    password: u.username || "",
-    udp: true,
-  };
-  if (q.security === "tls" || q.sni) p.tls = true;
-  if (q.sni) p.servername = q.sni;
-  if (q.type === "ws") {
-    p.network = "ws";
-    const ws = { path: q.path ? decodeURIComponent(q.path) : "" };
-    if (q.host) ws.headers = { Host: q.host };
-    p["ws-opts"] = ws;
-  }
-  return p;
-}
-function parseHy(u, hy2 = false) {
-  const q = parsedQs(u);
-  const name = getNameFromFragmentOrHost(u, hy2 ? "hysteria2" : "hysteria");
-  const p = {
-    name,
-    type: hy2 ? "hysteria2" : "hysteria",
-    server: u.hostname,
-    port: u.port ? Number(u.port) : null,
-    udp: true,
-  };
-  if (hy2) {
-    p.password = u.username || "";
-  } else {
-    p.auth = q.auth || "";
-    if ("insecure" in q)
-      p.insecure =
-        q.insecure === "1" || q.insecure === "true" || q.insecure === "True";
-    if ("upmbps" in q)
-      p["up-mbps"] = /^\d+$/.test(q.upmbps) ? Number(q.upmbps) : q.upmbps;
-    if ("downmbps" in q)
-      p["down-mbps"] = /^\d+$/.test(q.downmbps)
-        ? Number(q.downmbps)
-        : q.downmbps;
-  }
-  if (q.alpn)
-    p.alpn = q.alpn
-      .split(",")
-      .map((x) => x.trim())
-      .filter(Boolean);
-  return p;
-}
-function parseTuic(u) {
-  const q = parsedQs(u);
-  const name = getNameFromFragmentOrHost(u, "tuic");
-  let uuid = null,
-    passwd = null;
-  if (u.username && u.username.includes(":"))
-    [uuid, passwd] = u.username.split(":", 2);
-  else uuid = u.username || "";
-  const p = {
-    name,
-    type: "tuic",
-    server: u.hostname,
-    port: u.port ? Number(u.port) : null,
-    uuid,
-    password: passwd,
-    udp: true,
-  };
-  if (q.sni) p.sni = q.sni;
-  if (q.alpn) p.alpn = q.alpn.split(",").filter(Boolean);
-  if (q.congestion_control) p["congestion-controller"] = q.congestion_control;
-  else if (q["congestion-controller"])
-    p["congestion-controller"] = q["congestion-controller"];
-  if (q.udp_relay_mode) p["udp-relay-mode"] = q.udp_relay_mode;
-  return p;
-}
-function parseOne(url) {
-  const u = new URL(url);
-  const s = (u.protocol || "").replace(":", "").toLowerCase();
-  switch (s) {
-    case "vless":
-      return parseVless(u);
-    case "vmess":
-      return parseVmess(u);
-    case "ss":
-      return parseSs(u);
-    case "trojan":
-      return parseTrojan(u);
-    case "hysteria":
-    case "hy":
-      return parseHy(u, false);
-    case "hy2":
-      return parseHy(u, true);
-    case "tuic":
-      return parseTuic(u);
-    default:
-      throw new Error("Unsupported scheme: " + s);
-  }
-}
 function emitProxiesYaml(proxies) {
   const lines = [];
   emitLine(lines, "proxies:");
@@ -302,15 +61,32 @@ function emitProxiesYaml(proxies) {
       "sni",
       "auth_str",
       "auth",
+      "token",
+      "protocol",
+      "obfs",
+      "protocol-param",
+      "obfs-param",
+      "encryption",
     ])
       if (k in p) emitKv(lines, k, p[k], 4);
 
     if ("tls" in p) emitBool(lines, "tls", !!p.tls, 4);
     if ("udp" in p) emitBool(lines, "udp", !!p.udp, 4);
     if ("insecure" in p) emitBool(lines, "insecure", !!p.insecure, 4);
+    if ("skip-cert-verify" in p)
+      emitBool(lines, "skip-cert-verify", !!p["skip-cert-verify"], 4);
 
     if (p["up-mbps"]) emitKv(lines, "up-mbps", p["up-mbps"], 4, false);
     if (p["down-mbps"]) emitKv(lines, "down-mbps", p["down-mbps"], 4, false);
+    if (p.alpn) emitList(lines, "alpn", p.alpn, 4);
+    if (p.seed) emitKv(lines, "seed", p.seed, 4);
+    if (p.header) emitKv(lines, "header", p.header, 4);
+    if (p.plugin) emitKv(lines, "plugin", p.plugin, 4);
+    if (p["plugin-opts"]) {
+      emitLine(lines, "plugin-opts:", 4);
+      for (const [pk, pv] of Object.entries(p["plugin-opts"]))
+        emitKv(lines, pk, pv, 6);
+    }
 
     if (p["ws-opts"]) {
       emitLine(lines, "ws-opts:", 4);
@@ -325,6 +101,51 @@ function emitProxiesYaml(proxies) {
       emitLine(lines, "reality-opts:", 4);
       for (const [rk, rv] of Object.entries(p["reality-opts"]))
         if (rv) emitKv(lines, rk, rv, 6);
+    }
+    if (p["grpc-opts"]) {
+      emitLine(lines, "grpc-opts:", 4);
+      for (const [gk, gv] of Object.entries(p["grpc-opts"]))
+        emitKv(lines, gk, gv, 6);
+    }
+    if (p["h2-opts"]) {
+      emitLine(lines, "h2-opts:", 4);
+      emitKv(lines, "path", p["h2-opts"].path, 6);
+      if (p["h2-opts"].host) {
+        if (Array.isArray(p["h2-opts"].host))
+          emitList(lines, "host", p["h2-opts"].host, 6);
+        else emitKv(lines, "host", p["h2-opts"].host, 6);
+      }
+    }
+    if (p["http-opts"]) {
+      emitLine(lines, "http-opts:", 4);
+      const rawPath = p["http-opts"].path;
+      if (rawPath != null && rawPath !== "") {
+        const paths = Array.isArray(rawPath) ? rawPath : [rawPath];
+        emitList(lines, "path", paths, 6);
+      }
+      if (p["http-opts"].headers) {
+        emitLine(lines, "headers:", 6);
+        for (const [hk, hv] of Object.entries(p["http-opts"].headers)) {
+          if (hv == null || hv === "") continue;
+          const vals = Array.isArray(hv) ? hv : [hv];
+          emitList(lines, hk, vals, 8);
+        }
+      }
+    }
+    if (p["kcp-opts"]) {
+      emitLine(lines, "kcp-opts:", 4);
+      if (p["kcp-opts"].seed) emitKv(lines, "seed", p["kcp-opts"].seed, 6);
+      if (p["kcp-opts"].header) {
+        emitLine(lines, "header:", 6);
+        emitKv(lines, "type", p["kcp-opts"].header.type, 8);
+      }
+    }
+    if (p["tcp-opts"]) {
+      emitLine(lines, "tcp-opts:", 4);
+      if (p["tcp-opts"].header) {
+        emitLine(lines, "header:", 6);
+        emitKv(lines, "type", p["tcp-opts"].header.type, 8);
+      }
     }
 
     if (i !== proxies.length - 1) emitLine(lines, "");
@@ -390,18 +211,6 @@ function setStatus(kind, text) {
 /* =========================================================
    Helpers
 ========================================================= */
-function normalizeInputLines(raw) {
-  raw = raw.trim();
-  if (!raw) return [];
-  if (!raw.includes("://") && /^[A-Za-z0-9+/_-]+=*$/.test(raw)) {
-    const dec = b64decodeAuto(raw);
-    if (dec.includes("://")) raw = dec;
-  }
-  return raw
-    .split(/\s+/g)
-    .map((x) => x.trim())
-    .filter(Boolean);
-}
 function isoToFlag(iso) {
   iso = iso.toUpperCase();
   if (!/^[A-Z]{2}$/.test(iso)) return "";
@@ -1015,7 +824,6 @@ function makeRuleRow(kind, name, pretty, query = "") {
     if (selectedTarget && targets.includes(selectedTarget)) {
       targetSel.value = selectedTarget;
     } else if (targets.includes(targetSel.value)) {
-      // keep current
     } else {
       targetSel.value = targets[0];
     }
@@ -1430,18 +1238,18 @@ function emitGroupsYaml() {
 
   state.groups.forEach((g, gi) => {
     emitLine(lines, "- name: " + (g.name || "GROUP"), 2);
-    emitLine(lines, "  type: " + g.type, 0);
+    emitLine(lines, "    type: " + g.type, 0);
     if (g.icon) emitLine(lines, "  icon: " + g.icon, 0);
 
     const list = uniq([...(g.proxies || []), ...(g.manual || [])]);
     if (list.length) {
-      emitLine(lines, "  proxies:", 0);
-      list.forEach((pn) => emitLine(lines, "  - " + yamlQuote(pn), 0));
+      emitLine(lines, "    proxies:", 0);
+      list.forEach((pn) => emitLine(lines, "    - " + yamlQuote(pn), 0));
     }
 
     if (g.useSubs && g.useSubs.length) {
-      emitLine(lines, "  use:", 0);
-      g.useSubs.forEach((sn) => emitLine(lines, "  - " + yamlQuote(sn), 0));
+      emitLine(lines, "    use:", 0);
+      g.useSubs.forEach((sn) => emitLine(lines, "    - " + yamlQuote(sn), 0));
     }
 
     if (gi !== state.groups.length - 1) emitLine(lines, "");
@@ -1495,37 +1303,69 @@ function emitSubsYaml() {
 const rebuildInternalStateDebounced = debounce(rebuildInternalState, 400);
 
 function rebuildInternalState() {
-  const urls = normalizeInputLines(document.getElementById("input").value);
-
-  const proxies = [];
-  if (urls.length) {
-    for (const u of urls) {
-      try {
-        proxies.push(parseOne(u));
-      } catch {}
-    }
-  }
-  state.proxies = proxies;
+  const { proxies } = parser.parseMany(document.getElementById("input").value);
+  state.proxies = proxies || [];
 
   ensureAutoProxyGroup();
   renderGroups();
   renderRulesTargets();
 }
 
-function buildConfig() {
-  const urls = normalizeInputLines(document.getElementById("input").value);
+function resolveProxyNameConflicts(proxies, groups) {
+  if (!Array.isArray(proxies) || !proxies.length) return;
 
-  const proxies = [];
-  const errors = [];
-  if (urls.length) {
-    for (const u of urls) {
-      try {
-        proxies.push(parseOne(u));
-      } catch (e) {
-        errors.push({ u, err: e.message || String(e) });
-      }
+  const usedNames = new Set();
+  const baseCounters = {};
+  const baseToNewNames = {};
+  proxies.forEach((p) => {
+    if (!p) return;
+    let base = p.name != null ? String(p.name).trim() : "";
+    if (!base) base = "proxy";
+    let newName = base;
+    if (usedNames.has(newName)) {
+      let idx = baseCounters[base] || 1;
+      while (usedNames.has(base + "_" + idx)) idx++;
+      newName = base + "_" + idx;
+      baseCounters[base] = idx + 1;
+    } else {
+      baseCounters[base] = baseCounters[base] || 1;
     }
-  }
+
+    usedNames.add(newName);
+    if (!baseToNewNames[base]) baseToNewNames[base] = [];
+    baseToNewNames[base].push(newName);
+
+    p.name = newName;
+  });
+  if (!Array.isArray(groups) || !groups.length) return;
+  const remapList = (list) => {
+    if (!Array.isArray(list)) return list;
+    const usagePerBase = {};
+    return list.map((n) => {
+      const base = n != null ? String(n).trim() : "";
+      const variants = baseToNewNames[base];
+      if (!variants || !variants.length) return n;
+
+      const used = usagePerBase[base] || 0;
+      const idx = used < variants.length ? used : variants.length - 1;
+      usagePerBase[base] = used + 1;
+      return variants[idx];
+    });
+  };
+
+  groups.forEach((g) => {
+    if (!g) return;
+    if (g.proxies) g.proxies = remapList(g.proxies);
+    if (g.manual) g.manual = remapList(g.manual);
+  });
+}
+
+function buildConfig() {
+  const { proxies = [], errors = [] } = parser.parseMany(
+    document.getElementById("input").value,
+    { collectErrors: true }
+  );
+  resolveProxyNameConflicts(proxies, state.groups);
   state.proxies = proxies;
 
   ensureAutoProxyGroup();
@@ -1548,6 +1388,10 @@ function buildConfig() {
   if (rulesYaml) yaml += (yaml ? "\n" : "") + rulesYaml.trim() + "\n";
 
   if (!yaml.trim()) {
+    if (errors.length) {
+      setStatus("err", errors[0].err || t("emptyStatus"));
+      return;
+    }
     document.getElementById("output").textContent = t("nothingToBuild");
     setStatus("err", t("emptyStatus"));
     return;
@@ -1601,7 +1445,6 @@ document.getElementById("clearBtn").addEventListener("click", () => {
   setStatus(null, t("clearedStatus"));
 });
 
-/* copy/download */
 document.getElementById("copyBtn").addEventListener("click", async () => {
   const text = document.getElementById("output").textContent.trim();
   if (!text) {
@@ -1639,7 +1482,6 @@ document.getElementById("downloadBtn").addEventListener("click", () => {
   setStatus("ok", t("downloaded"));
 });
 
-/* hotkey */
 document.getElementById("input").addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key === "Enter") buildConfig();
 });
