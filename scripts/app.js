@@ -1928,13 +1928,15 @@ function normalizeCidr(raw) {
 }
 
 function normalizeAsn(raw) {
-  const v = raw.trim();
+  let v = raw.trim().toUpperCase();
+  if (v.startsWith("AS")) v = v.slice(2);
   if (!/^\d+$/.test(v)) {
     return {
       ok: false,
       error: t("manualErrorAsnNotNumber", { value: raw }),
     };
   }
+  return { ok: true, value: v };
 }
 
 function normalizeProcessName(raw) {
@@ -1956,14 +1958,17 @@ function normalizeProcessPath(raw) {
   if (!v) {
     return { ok: false, error: t("manualErrorProcessPathEmpty") };
   }
+
   const looksWindows = /^[a-zA-Z]:\\/.test(v) || v.startsWith("\\\\");
   const looksUnix = v.startsWith("/");
+
   if (!looksWindows && !looksUnix) {
     return {
       ok: false,
       error: t("manualErrorProcessPathFull"),
     };
   }
+  return { ok: true, value: v };
 }
 
 function normalizeManualRule(type, rawValue) {
