@@ -734,9 +734,6 @@ function makeRuleRow(kind, name, pretty, query = "") {
       <span class="rule-name"
             title="${escapeHtml(pretty)}"
             data-full="${escapeHtml(pretty)}">${displayName}</span>
-      <button class="icon-btn"
-              data-role="rule-clear"
-              title="${t("ruleClearTitle")}">✕</button>
     </div>
     <div class="rule-actions">
       <select data-role="rule-action"></select>
