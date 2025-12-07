@@ -1,88 +1,138 @@
 [🌐 打开 Mihomo Constructor](https://raywari.github.io/mihomo-constructor/)
 
-**README 语言：**  
-- **中文（当前）**  
-- **Русский（俄语）** — https://github.com/raywari/mihomo-constructor/blob/main/README_RU.md  
-- **English（英语）** — https://github.com/raywari/mihomo-constructor/blob/main/README.md  
-- **فارسی（波斯语 / 伊朗语）** — https://github.com/raywari/mihomo-constructor/blob/main/README_FA.md  
+**README 语言：**
+
+- **English** — [https://github.com/raywari/mihomo-constructor/blob/main/README.md](https://github.com/raywari/mihomo-constructor/blob/main/README.md)
+- **Русский** — [https://github.com/raywari/mihomo-constructor/blob/main/README_RU.md](https://github.com/raywari/mihomo-constructor/blob/main/README_RU.md)
+- **中文 (Chinese)** — [https://github.com/raywari/mihomo-constructor/blob/main/README_ZH.md](https://github.com/raywari/mihomo-constructor/blob/main/README_ZH.md)
+- **فارسی (Persian / Iranian)** — [https://github.com/raywari/mihomo-constructor/blob/main/README_FA.md](https://github.com/raywari/mihomo-constructor/blob/main/README_FA.md)
 
 # Mihomo Constructor
 
-一个方便的 Clash/Mihomo 配置构建器，主打可视化 UI 与自动生成 YAML，无需手动复制粘贴。
+一个纯前端的 Clash/Mihomo 配置构建器，主打可视化界面和干净的 YAML 输出，这样你就不用再手动到处复制粘贴配置片段了。
 
-> ⚠️ 本项目并非 Clash/Mihomo 团队的官方产品。  
-> 不会将其商标用于商业目的，也不试图“抢占”名称。  
-> 它只是一个独立的便捷工具，用于生成与其配置格式兼容的文件。
+特别适合那种：手里乱七八糟一堆不同提供商的代理链接和订阅，但又想要一个统一、整洁的 Clash/Mihomo 配置，而且不想自己去改 YAML。
 
----
+> ⚠️ 这个项目不是 Clash/Mihomo 团队的官方产品，也不隶属于 MetaCubeX 或其他客户端作者。它只是支持它们的配置格式和规则集。
 
-## 这是什么
+## 工具能做什么
 
-**Mihomo Constructor** 是一个网页工具，帮助你从以下内容组装 Clash/Mihomo 配置：
+**Mihomo Constructor** 会帮你生成一个完整的 Clash/Mihomo `config.yaml`，组合内容包括：
 
-- 代理链接（`vless://`、`vmess://`、`ss://` 等），
-- 订阅（proxy-providers），
-- 代理分组（proxy groups），
-- 规则（GEOSITE/GEOIP、rule-providers），
-- 如有需要，也支持手写 YAML。
+- 常见格式的代理链接（`vless://`、`vmess://`、`ss://`、`trojan://`、`ssr://`、`hysteria://`、`hy://`、`hy2://`、`hysteria2://`、`tuic://`），
+- 支持选择拉取方式的订阅（proxy-providers），
+- 带图标、手动条目和自动生成代理的代理组，
+- 来自 GEOSITE / GEOIP 列表、规则提供者（rule-providers）或手写规则（DOMAIN/IP/PROCESS）的规则，
+- 当你需要完全掌控时，可以插入用于订阅、分组和规则的原始 YAML 块。
 
-本项目完全前端化：打开网页 → 粘贴数据 → 调整设置 → 直接得到可用的 `config.yaml`。
+整个应用就是一张静态 HTML 页面，使用 ES modules，无任何后端：打开页面、贴上你的东西、调好设置，然后复制或下载生成好的 YAML 就行。
 
 ---
 
-## 功能特性
+## 功能概览
 
-- **链接输入**
-  - 一次性粘贴多条链接 — 应用会自动解析并加入 `proxies`。
+### 解析输入
 
-- **订阅（proxy-providers）**
-  - 支持多个订阅链接。
-  - *Advanced Subscriptions (YAML)* 模式 — 可手动替换/补充 YAML。
+- 解析器会把 base64 或纯文本输入统一处理，并且能从一次粘贴里拆出多条链接。
+- 支持的协议包括 VLESS、VMess、Shadowsocks、Trojan、ShadowsocksR、Hysteria（v1/v2）、`hy://` 和 TUIC，所以混合列表基本开箱即用。
 
-- **代理分组（Proxy Groups）**
-  - 点击“➕ 添加组”按钮即可新增分组。
-  - *Advanced Groups (YAML)* 模式 — 通过文本完整控制分组 YAML。
+### 订阅
 
-- **GEOSITE / GEOIP**
-  - 加载域名与 IP 列表。
-  - 按类别/国家搜索。
-  - 通过“⚙️ 规则自动分组”按钮自动生成规则。
+- 可以一次性添加多个订阅 URL，每条都会自动变成一个 provider。
+- 可以为每个订阅选择获取方式（DIRECT 直连或经由 Proxy），并打开高级 YAML 区域，手动覆盖 provider 的定义。
 
-- **高级规则 + Rule-Providers**
-  - 如果内置控件不够用 — 开启高级模式直接编辑 YAML 规则块。
+### 代理组
 
-- **输出成品 YAML**
-  - 所有内容会合并为一个配置：`proxies + groups + providers + rules`。
-  - 可直接：
-    - 复制到剪贴板，
-    - 下载为 `config.yaml`。
+- 在界面里创建代理组，选择类型（`select`、`url-test`、`fallback`、`load-balance`）、图标，以及手动添加的代理列表。
+- 所有解析出来的代理都会以带复选框的列表列出，方便你分配到各个组中；删除或重命名组时，依赖该组的规则也会自动更新。
+- 自动生成的 **`auto`** 组会聚合所有发现的代理和订阅，就算手动组是空的，MATCH 规则也能正常工作。
+
+### 规则和优先级
+
+- 从内置的文本文件中加载 GEOSITE/GEOIP 分类并支持搜索；可以添加规则提供者（rule-providers），也可以写手动 DOMAIN / IP / PROCESS 规则。
+- 一键自动分组规则，选择默认的 MATCH 目标（DIRECT/REJECT/某个组），并且可以在 **Rule order** 列表中调整优先级顺序。
+- 当你想直接粘贴现成配置时，规则提供者和规则本身都提供高级 YAML 区块。
+
+### 输出与状态
+
+- Build 时会把 `proxies + groups + providers + rules` 合并成一段 YAML，显示状态摘要，并允许你立即复制到剪贴板或下载为 `config.yaml`。
+
+### 本地化
+
+- 界面自带英文、中文、波斯语和俄语词典，语言偏好会保存在本地。
+- Emoji 通过 Twemoji 渲染，在不同平台上看起来会更一致。
 
 ---
 
-## 使用与相关项目
+## 如何使用界面
 
-我面向 Clash/Mihomo 生态，基于开源项目、其配置格式与现有规则集开发这个便捷构建器。
+1. 把**链接粘贴**到 “Input links” 输入框里，或者先点一下 **Demo** 填入示例节点，然后点击 **Build config**。
+2. 在 **Subscriptions (proxy-providers)** 区块中**添加订阅**，设定拉取模式，如果你希望直接提供 provider 的原始 YAML，可以打开 **Advanced Subscriptions (YAML)**。
+3. 通过 **➕ Add group** **配置代理组**：选择类型、图标、手动添加的代理，以及勾选哪些解析出来的代理要加入这个组。高级模式支持直接写 YAML。
+4. 使用 **📄 Load**（GEOSITE）和 **🌍 Load**（GEOIP）**加载规则数据**，搜索分类、添加规则提供者，或输入手动规则。**⚙️ Auto rules group** 可以生成一套默认规则骨架，你也可以在 **Rule order** 里微调规则优先级。
+5. **设置默认 MATCH 行为**（DIRECT/REJECT/某个组），如果需要，再去高级规则 YAML 里做细调。
+6. **构建并导出**：在 **Ready YAML** 面板中可以看到合并后的配置，并通过 **Copy** 或 **Download config.yaml** 按钮导出。状态标签会提示数量统计或解析错误。
 
-部分相关/配套项目：
+---
 
-- **Mihomo（核心）**  
-  与本项目配置格式兼容的核心仓库：  
-  https://github.com/MetaCubeX/mihomo
+## 仓库结构
 
-- **Mihomo Dashboard（metacubexd）**  
-  官方网页面板，用于通过 Web 界面管理 Mihomo：  
-  https://github.com/MetaCubeX/metacubexd
+- `index.html` — 单页 UI，使用原生 JS modules，包含所有输入、订阅、分组、规则、状态与 YAML 输出控件。
+- `styles/` — 界面所需的字体和样式。
+- `src/main.js` — 入口文件，负责解析输入、重建状态并生成 YAML 输出。
+- `src/parser.js` — 支持多种协议和 base64 输入的健壮代理链接解析器。
+- `src/groups.js` — 管理代理组的逻辑与 UI 绑定。
+- `src/subs.js` — 管理订阅（proxy-providers）的逻辑与 UI 绑定。
+- `src/rules.js` — 规则管理、规则提供者、规则顺序以及 MATCH 行为。
+- `src/geo.js` — 从内置文件加载并搜索 GEOSITE/GEOIP 分类。
+- `src/yaml-gen.js` — 根据应用状态组装最终 YAML。
+- `src/i18n.js` 和 `src/i18n/` — 语言选择器、翻译词典与 Twemoji 集成。
+- `geo/` — 预生成的 `geosite.txt` / `geoip.txt` 列表，用于离线浏览 GEOSITE/GEOIP 分类。
+- `geo-update.py` — 用于从 `meta-rules-dat` 更新 GEO 列表的辅助脚本。
 
-- **meta-rules-dat**  
-  为 Mihomo 提供的规则集（GEOSITE/GEOIP 等）：  
-  https://github.com/MetaCubeX/meta-rules-dat
+---
 
-- **Clash / Clash.Meta 及客户端**  
-  Clash 相关核心与客户端导航，包含不同实现与 GUI：  
-  https://github.com/clash-version/clash-download
+## 本地运行
 
-Mihomo Constructor 用于补充这些项目，并非它们的 fork。  
-它是一个独立工具，基于其格式之上，帮助你更快、更轻松地组装稳定的 Clash/Mihomo 配置。
+应用是静态的：clone 仓库后，用任意静态服务器把这个目录跑起来，让 ES modules 能正常加载，例如：
 
-- **“Clash”**、**“Mihomo”** 及其他提到的产品名称归其作者所有。
-- Mihomo Constructor 与 MetaCubeX 团队、Clash 作者或其他客户端团队无隶属关系。
+```bash
+python -m http.server 8000
+```
+
+然后在浏览器打开 `http://localhost:8000/` 即可。不需要构建步骤，也不需要任何后端服务。
+
+---
+
+## 更新 GEO 文件
+
+`geo/geosite.txt` 和 `geo/geoip.txt` 来自 [MetaCubeX/meta-rules-dat](https://github.com/MetaCubeX/meta-rules-dat)，通过 `geo-update.py` 重新生成：
+
+```bash
+python geo-update.py
+```
+
+脚本会 clone 上游仓库，提取分类名（去掉扩展名），把文本文件移动到 `geo/` 目录中，然后删除临时 clone。
+
+---
+
+## 限制
+
+- **没有后端：** 应用完全在浏览器中运行，订阅由客户端直接拉取。
+- **仅限浏览器：** 没有 CLI 封装，这个工具专注于交互式 Web UI。
+- **客户端兼容性：** 输出针对 Mihomo/Clash.Meta 风格配置做了优化。某些分支或高度定制的客户端可能仍需手动微调。
+- **不内置节点测速：** 应用不会 ping 或 benchmark 代理节点，它只负责生成配置 YAML。
+
+---
+
+## 本地化与贡献
+
+- 可以在 `src/i18n/*.js` 中添加或调整翻译，并在 `src/i18n.js` 中注册新语言。
+- 欢迎提交 issue 或 PR 来改进解析器、增加预设或优化 UI。
+- 请把各语言的 README 翻译放在各自的文件里；英文版本是主要和权威的来源。
+
+---
+
+## 署名
+
+Mihomo Constructor 是一个基于 Clash/Mihomo 配置格式和规则集构建的独立辅助工具。文中提到的所有产品名称都归其各自作者所有。
