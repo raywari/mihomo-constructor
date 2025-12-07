@@ -952,7 +952,6 @@ body.rtl .switch {
   gap: 10px;
   grid-auto-flow: column;
   -webkit-tap-highlight-color: transparent;
-  tap-highlight-color: transparent;
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
