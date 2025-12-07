@@ -1,5 +1,10 @@
-(() => {
-  const dict = {
+export default {
+  meta: {
+    value: "fa",
+    label: "فا",
+    flag: "🇮🇷",
+  },
+  dict: {
     languageLabel: "زبان",
     brandSubtitle: "سازنده پیکربندی Clash/Mihomo",
     brandActionLabel: "مشاهده در گیت‌هاب",
@@ -140,14 +145,5 @@
     manualErrorProcessPathEmpty: "PROCESS-PATH خالی است",
     manualErrorProcessPathFull:
       "PROCESS-PATH باید یک مسیر کامل باشد (ویندوز یا یونیکس)",
-  };
-
-  window.translations = window.translations || {};
-  window.languageOptions = window.languageOptions || [];
-
-  window.translations.fa = dict;
-
-  if (!window.languageOptions.some((o) => o.value === "fa")) {
-    window.languageOptions.push({ value: "fa", label: "فا", flag: "🇮🇷" });
-  }
-})();
+  },
+};

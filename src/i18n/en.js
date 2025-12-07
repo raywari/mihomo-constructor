@@ -1,5 +1,10 @@
-(() => {
-  const dict = {
+export default {
+  meta: {
+    value: "en",
+    label: "EN",
+    flag: "🇬🇧",
+  },
+  dict: {
     languageLabel: "Language",
     brandSubtitle: "Config builder for Clash/Mihomo",
     brandActionLabel: "View on GitHub",
@@ -124,12 +129,6 @@
     ruleOrderKindRuleSet: "RULE-SET",
     ruleOrderKindManual: "MANUAL",
     ruleOrderKindMatch: "MATCH (default)",
-    manualRulesTitle: "Manual Rules",
-    manualRulesSub: "DOMAIN / IP / PROCESS rules entered by hand",
-    manualRulesAddButton: "➕ Add rule",
-    manualRulesValuePlaceholder: "example.com / 192.168.0.1 / chrome.exe",
-    manualRulesHint:
-      "Action: DIRECT / REJECT / proxy-group — e.g. PROCESS-NAME,chrome.exe,PROXY · IP-CIDR,1.2.3.4/32,DIRECT",
     manualRulesEmpty: "No manual rules yet",
     manualRulesDelete: "Delete rule",
     manualRulesFillAll: "Fill TYPE, VALUE and ACTION",
@@ -146,13 +145,5 @@
     manualErrorProcessPathEmpty: "PROCESS-PATH is empty",
     manualErrorProcessPathFull:
       "PROCESS-PATH must be a full path (Windows or Unix)",
-  };
-
-  window.translations = window.translations || {};
-  window.languageOptions = window.languageOptions || [];
-
-  window.translations.en = dict;
-  if (!window.languageOptions.some((o) => o.value === "en")) {
-    window.languageOptions.push({ value: "en", label: "EN", flag: "🇬🇧" });
-  }
-})();
+  },
+};

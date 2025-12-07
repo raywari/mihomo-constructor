@@ -1,5 +1,10 @@
-(() => {
-  const dict = {
+export default {
+  meta: {
+    value: "ru",
+    label: "РУ",
+    flag: "🇷🇺",
+  },
+  dict: {
     languageLabel: "Язык",
     brandSubtitle: "Конструктор конфигов для Clash/Mihomo",
     brandActionLabel: "Проект на GitHub",
@@ -138,14 +143,5 @@
     manualErrorProcessPathEmpty: "PROCESS-PATH пустой",
     manualErrorProcessPathFull:
       "PROCESS-PATH должен быть полным путём (Windows или Unix)",
-  };
-
-  window.translations = window.translations || {};
-  window.languageOptions = window.languageOptions || [];
-
-  window.translations.ru = dict;
-
-  if (!window.languageOptions.some((o) => o.value === "ru")) {
-    window.languageOptions.push({ value: "ru", label: "РУ", flag: "🇷🇺" });
-  }
-})();
+  },
+};

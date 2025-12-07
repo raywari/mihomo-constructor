@@ -1,5 +1,10 @@
-(() => {
-  const dict = {
+export default {
+  meta: {
+    value: "zh",
+    label: "中文",
+    flag: "🇨🇳",
+  },
+  dict: {
     languageLabel: "语言",
     brandSubtitle: "Clash/Mihomo 配置生成器",
     brandActionLabel: "在 GitHub 查看",
@@ -135,14 +140,5 @@
     manualErrorProcessPathEmpty: "PROCESS-PATH 为空",
     manualErrorProcessPathFull:
       "PROCESS-PATH 必须是完整路径（Windows 或 Unix）",
-  };
-
-  window.translations = window.translations || {};
-  window.languageOptions = window.languageOptions || [];
-
-  window.translations.zh = dict;
-
-  if (!window.languageOptions.some((o) => o.value === "zh")) {
-    window.languageOptions.push({ value: "zh", label: "中文", flag: "🇨🇳" });
-  }
-})();
+  },
+};
