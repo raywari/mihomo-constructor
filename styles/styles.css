@@ -1464,13 +1464,9 @@ mark {
   }
 }
 
-@media (hover: none) {
+@media (hover: hover) and (pointer: fine) {
   .primary:hover {
-    transform: none;
-    background: linear-gradient(135deg, #4f9dff, #6366f1);
-    border-color: transparent;
-    box-shadow: 0 18px 40px rgba(59, 130, 246, 0.6),
-      0 0 0 1px rgba(129, 140, 248, 0.6);
+    transform: translateY(-1px);
   }
 }
 
@@ -1492,16 +1488,12 @@ mark {
   }
 }
 
-/* --- MANUAL RULES: переопределяем лейаут --- */
-
-/* карточка правила */
 #manualRulesList .rule-item {
-  position: relative; /* чтобы иконка могла позиционироваться внутри */
-  display: block; /* убираем grid, он нам больше не нужен */
-  padding-right: 40px; /* даём место под иконку справа на десктопе */
+  position: relative;
+  display: block;
+  padding-right: 40px;
 }
 
-/* главная строка: pill + name */
 #manualRulesList .rule-main {
   display: flex;
   align-items: center;
@@ -1509,56 +1501,47 @@ mark {
   min-width: 0;
 }
 
-/* текст растягивается, чтобы иконка «прилипала» */
 #manualRulesList .rule-name {
   flex: 1 1 auto;
   min-width: 0;
 }
 
-/* действия под основной строкой */
 #manualRulesList .rule-actions {
   display: grid;
   gap: 8px;
   margin-top: 10px;
 }
 
-/* сама icon-btn – прибита к правому краю карточки */
 #manualRulesList .icon-btn {
   position: absolute;
   top: 50%;
-  right: 10px; /* можно 8–12 подогнать под вкус */
+  right: 10px;
   transform: translateY(-50%);
   margin: 0;
 }
 
-/* --- МОБИЛКИ --- */
 @media (max-width: 600px) {
-  /* уменьшаем правый отступ, иконка теперь в самом углу сверху */
   #manualRulesList .rule-item {
     padding-right: 12px;
   }
 
-  /* pill сверху, под ним name */
   #manualRulesList .rule-main {
     flex-direction: column;
     align-items: flex-start;
     gap: 6px;
   }
 
-  /* иконка справа сверху */
   #manualRulesList .icon-btn {
-    top: 11px; /* чуть ниже верхнего паддинга карточки */
+    top: 11px;
     right: 10px;
-    transform: none; /* убираем центрирование по вертикали */
+    transform: none;
   }
 
-  /* name под pill + иконкой, на всю ширину */
   #manualRulesList .rule-name {
     width: 100%;
     white-space: normal;
   }
 
-  /* селекты / action-блок под всем этим */
   #manualRulesList .rule-actions {
     margin-top: 10px;
   }
