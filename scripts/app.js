@@ -1,10 +1,3 @@
-function resolveParser() {
-  try {
-    if (typeof window !== "undefined" && window.parser) return window.parser;
-    if (typeof parser !== "undefined") return parser;
-  } catch {}
-  return null;
-}
 function yamlQuote(s) {
   if (s == null) return null;
   s = String(s)
@@ -153,9 +146,6 @@ function emitProxiesYaml(proxies) {
   return lines.join("\n") + "\n";
 }
 
-/* =========================================================
-   App state
-========================================================= */
 const state = {
   proxies: [],
   groups: [],
@@ -169,15 +159,29 @@ const state = {
   },
   subs: [],
   match: { mode: "auto", value: "" },
+  ruleProviders: [],
+  manualRules: [],
+  ruleOrder: [],
 };
 
-const GEOSITE_URL = "geo/geosite.txt";
-const GEOIP_URL = "geo/geoip.txt";
+let ruleOrderListEl;
+
+const RULE_BLOCKS = [
+  { id: "GEOSITE", label: "GEOSITE — domain lists (geosite)" },
+  { id: "GEOIP", label: "GEOIP — countries & IP ranges" },
+  { id: "RULE-SET", label: "RULE-SET — rule-providers" },
+  { id: "MANUAL", label: "MANUAL — ручные DOMAIN / IP / PROCESS" },
+  { id: "MATCH", label: "MATCH — правило по умолчанию" },
+];
+
+const GEOSITE_URL = "/geo/geosite.txt";
+const GEOIP_URL = "/geo/geoip.txt";
 const MATCH_AUTO_VALUE = "__auto__";
 const MATCH_POLICIES = [
   { value: "DIRECT", labelKey: "matchPolicyDirect" },
   { value: "REJECT", labelKey: "matchPolicyReject" },
 ];
+const AUTO_GROUP_NAME = "auto";
 
 const translations = window.translations || {};
 const languageOptions = window.languageOptions || [];
@@ -208,9 +212,6 @@ function setStatus(kind, text) {
   document.getElementById("statusText").textContent = text;
 }
 
-/* =========================================================
-   Helpers
-========================================================= */
 function isoToFlag(iso) {
   iso = iso.toUpperCase();
   if (!/^[A-Z]{2}$/.test(iso)) return "";
@@ -262,27 +263,57 @@ function highlightMatch(text, query) {
   return `${prefix}${before}<mark>${match}</mark>${after}${suffix}`;
 }
 
-function debounce(fn, delay = 250) {
-  let timer;
-  return function (...args) {
-    const ctx = this;
-    clearTimeout(timer);
-    timer = setTimeout(() => fn.apply(ctx, args), delay);
-  };
+function fillActionSelect(selectEl, { includeReject = true } = {}) {
+  if (!selectEl) return;
+  const current = selectEl.value;
+  selectEl.innerHTML = "";
+
+  const ph = document.createElement("option");
+  ph.value = "";
+  ph.textContent = t("ruleActionPlaceholder") || "ACTION";
+  selectEl.appendChild(ph);
+
+  selectEl.appendChild(new Option("DIRECT", "DIRECT"));
+  if (includeReject) selectEl.appendChild(new Option("REJECT", "REJECT"));
+
+  (state.groups || []).forEach((g) => {
+    const name = g?.name?.trim();
+    if (!name) return;
+    selectEl.appendChild(new Option(name, name));
+  });
+
+  if ([...selectEl.options].some((o) => o.value === current)) {
+    selectEl.value = current;
+  } else {
+    selectEl.value = "";
+  }
 }
 
 function applyTranslations() {
-  document.documentElement.lang = currentLang;
+  document.documentElement.setAttribute("data-lang", currentLang);
+
   document.documentElement.dir = currentLang === "fa" ? "rtl" : "ltr";
   document.body.classList.toggle("rtl", currentLang === "fa");
 
   document.querySelectorAll("[data-i18n]").forEach((el) => {
     const key = el.dataset.i18n;
     const attr = el.dataset.i18nAttr;
+    const value = t(key);
+
     if (attr) {
-      el.setAttribute(attr, t(key));
+      el.setAttribute(attr, value);
     } else {
-      el.textContent = t(key);
+      el.textContent = value;
+    }
+
+    if (currentLang === "zh") {
+      el.setAttribute("lang", "zh");
+    } else if (currentLang === "fa") {
+      el.setAttribute("lang", "fa");
+    } else if (currentLang === "ru") {
+      el.setAttribute("lang", "ru");
+    } else {
+      el.setAttribute("lang", "en");
     }
   });
 
@@ -290,15 +321,24 @@ function applyTranslations() {
     const key = el.dataset.i18nAria;
     el.setAttribute("aria-label", t(key));
   });
-
   syncDynamicTexts();
+  applyTwemoji(document.body);
 }
 
 function syncDynamicTexts() {
   const output = document.getElementById("output");
-  if (!output.textContent.trim() || output.dataset.placeholder === "true") {
+  if (!output) return;
+
+  const isEmpty = !output.textContent.trim();
+  const isPlaceholder = output.getAttribute("data-placeholder") === "true";
+
+  if (isEmpty || isPlaceholder) {
     output.textContent = t("outputPlaceholder");
     output.dataset.placeholder = "true";
+  }
+
+  if (!isEmpty && !isPlaceholder) {
+    output.removeAttribute("data-placeholder");
   }
 
   if (!state.geosite.length)
@@ -312,6 +352,12 @@ function syncDynamicTexts() {
     const current = document.getElementById("statusText")?.textContent || "";
     setStatus(null, current);
   }
+}
+
+function applyTwemojiToLang() {
+  const scope = document.querySelector(".lang-control");
+  if (!scope) return;
+  applyTwemoji(scope);
 }
 
 function setupLanguageSelector() {
@@ -332,8 +378,8 @@ function setupLanguageSelector() {
       "aria-label",
       `${t("languageLabel")}: ${opt?.label || opt?.value || ""}`.trim()
     );
+    applyTwemojiToLang();
   };
-
   const renderMenu = () => {
     menu.innerHTML = languageOptions
       .map(
@@ -347,8 +393,8 @@ function setupLanguageSelector() {
         `
       )
       .join("");
+    applyTwemojiToLang();
   };
-
   const closeMenu = () => {
     menu.classList.remove("open");
     btn.setAttribute("aria-expanded", "false");
@@ -394,9 +440,6 @@ function setupLanguageSelector() {
   renderButton();
 }
 
-/* =========================================================
-   UI: Proxy Groups
-========================================================= */
 const groupsContainer = document.getElementById("groupsContainer");
 function renderGroups() {
   groupsContainer.innerHTML = "";
@@ -442,16 +485,20 @@ function renderGroups() {
       </div>
       <div class="row" style="justify-content:space-between">
         <div class="hint">${t("updateProxyHint")}</div>
-        <button class="danger" data-del>🗑 ${t("deleteGroup")}</button>
+        <button class="danger" data-del>\u{1F5D1}\uFE0F ${t(
+          "deleteGroup"
+        )}</button>
       </div>
     `;
 
     const [nameInp, typeSel, iconInp, manualInp] =
       card.querySelectorAll("input, select");
-    nameInp.addEventListener("input", (e) => {
+    nameInp.addEventListener("change", (e) => {
       g.name = e.target.value.trim() || "GROUP";
-      renderRulesTargets();
       renderMatchSelect();
+      rebuildRuleOrderFromState();
+      renderRuleProvidersPolicySelect();
+      renderSubs();
     });
     typeSel.addEventListener("change", (e) => {
       g.type = e.target.value;
@@ -491,179 +538,71 @@ function renderGroups() {
     groupsContainer.appendChild(empty);
   }
   renderMatchSelect();
+  const manualAction = document.getElementById("manualRuleAction");
+  if (manualAction) fillActionSelect(manualAction);
 }
 
 document.getElementById("addGroupBtn").addEventListener("click", () => {
+  const BASE = "NAME_";
+
+  let maxIndex = 0;
+  for (const g of state.groups) {
+    if (!g || typeof g.name !== "string") continue;
+    const m = g.name.match(/^NAME_(\d+)$/);
+    if (m) {
+      const num = Number(m[1]);
+      if (Number.isFinite(num) && num > maxIndex) {
+        maxIndex = num;
+      }
+    }
+  }
+
+  const nextName = `${BASE}${maxIndex + 1}`;
+
   state.groups.push({
-    name: "PROXY",
+    name: nextName,
     type: "select",
     icon: "",
     proxies: [],
     manual: [],
   });
+
   renderGroups();
   renderRulesTargets();
   renderMatchSelect();
 });
 
-/* =========================================================
-   UI: GEOSITE / GEOIP lists + rules
-========================================================= */
 const geositeListEl = document.getElementById("geositeList");
 const geoipListEl = document.getElementById("geoipList");
 const geositeCountEl = document.getElementById("geositeCount");
 const geoipCountEl = document.getElementById("geoipCount");
+const geositeShowMoreBtn = document.getElementById("geositeShowMore");
+const geoipShowMoreBtn = document.getElementById("geoipShowMore");
 
-const VIRTUAL_BATCH = 200;
+const MAX_LIST_ITEMS = 200;
 
-function createVirtualList(container, renderItem) {
-  const spacerTop = document.createElement("div");
-  const spacerBottom = document.createElement("div");
-  const host = document.createElement("div");
-  host.style.display = "flex";
-  host.style.flexDirection = "column";
-  host.style.gap = "10px";
+const INITIAL_LIST_LIMIT = 200;
+const LIST_LIMIT_STEP = 200;
 
-  container.innerHTML = "";
-  container.style.position = "relative";
-  container.style.display = "block";
-  container.style.overflowY = "auto";
-  container.append(spacerTop, host, spacerBottom);
+let geositeVisibleLimit = INITIAL_LIST_LIMIT;
+let geoipVisibleLimit = INITIAL_LIST_LIMIT;
 
-  const state = {
-    items: [],
-    limit: VIRTUAL_BATCH,
-    batchSize: VIRTUAL_BATCH,
-    total: 0,
-    itemHeight: 64,
-    measured: false,
-    hasMessage: false,
-  };
+if (geositeShowMoreBtn) {
+  geositeShowMoreBtn.addEventListener("click", () => {
+    geositeVisibleLimit += LIST_LIMIT_STEP;
+    renderGeositeList(geositeFilterRaw);
+  });
+}
 
-  function measureRow() {
-    if (state.measured) return;
-    const first = host.firstChild;
-    if (!first) return;
-    const gap = parseFloat(getComputedStyle(host).rowGap || "0") || 0;
-    state.itemHeight = first.getBoundingClientRect().height + gap;
-    state.measured = true;
-  }
-
-  function renderVisible() {
-    if (state.hasMessage) return;
-    const total = state.total;
-    if (!total) {
-      host.innerHTML = "";
-      spacerTop.style.height = spacerBottom.style.height = "0px";
-      return;
-    }
-
-    const viewH = container.clientHeight || 400;
-    const rowH = Math.max(1, state.itemHeight);
-    const start = Math.max(0, Math.floor(container.scrollTop / rowH) - 2);
-    const visible = Math.max(1, Math.ceil(viewH / rowH) + 4);
-    const end = Math.min(total, start + visible);
-
-    spacerTop.style.height = `${start * rowH}px`;
-    spacerBottom.style.height = `${Math.max(0, (total - end) * rowH)}px`;
-
-    const frag = document.createDocumentFragment();
-    for (let i = start; i < end; i++)
-      frag.appendChild(renderItem(state.items[i]));
-    host.innerHTML = "";
-    host.appendChild(frag);
-
-    if (!state.measured) {
-      measureRow();
-      if (state.measured) renderVisible();
-    }
-  }
-
-  function setItems(list) {
-    state.items = list;
-    state.limit = state.batchSize;
-    state.total = Math.min(list.length, state.limit);
-    state.measured = false;
-    state.hasMessage = false;
-    renderVisible();
-  }
-
-  function showMore() {
-    if (state.limit >= state.items.length) return;
-    state.limit = Math.min(state.limit + state.batchSize, state.items.length);
-    state.total = Math.min(state.items.length, state.limit);
-    renderVisible();
-  }
-
-  function showMessage(node) {
-    state.items = [];
-    state.total = 0;
-    state.hasMessage = true;
-    spacerTop.style.height = spacerBottom.style.height = "0px";
-    host.innerHTML = "";
-    host.appendChild(node);
-  }
-
-  function resetLimit() {
-    state.limit = state.batchSize;
-    state.total = Math.min(state.items.length, state.limit);
-  }
-
-  container.addEventListener("scroll", renderVisible);
-  window.addEventListener("resize", renderVisible);
-
-  return {
-    setItems,
-    showMore,
-    showMessage,
-    resetLimit,
-    render: renderVisible,
-    getVisibleCount: () => state.total,
-    getTotalItems: () => state.items.length,
-    hasMore: () => state.items.length > state.total,
-    getBatchSize: () => state.batchSize,
-  };
+if (geoipShowMoreBtn) {
+  geoipShowMoreBtn.addEventListener("click", () => {
+    geoipVisibleLimit += LIST_LIMIT_STEP;
+    renderGeoipList(geoipFilterRaw);
+  });
 }
 
 let geositeFilterRaw = "";
 let geoipFilterRaw = "";
-
-const geositeVirtual = createVirtualList(geositeListEl, (name) =>
-  makeRuleRow("geosite", name, name, geositeFilterRaw)
-);
-const geoipVirtual = createVirtualList(geoipListEl, (code) => {
-  const flag = isoToFlag(code);
-  const pretty = flag ? `${flag} ${code}` : code;
-  return makeRuleRow("geoip", code, pretty, geoipFilterRaw);
-});
-
-function makeMoreBtn(container, onClick) {
-  const btn = document.createElement("button");
-  btn.className = "ghost";
-  btn.style.width = "100%";
-  btn.style.marginTop = "8px";
-  btn.textContent = t("showMore");
-  btn.addEventListener("click", onClick);
-  container.insertAdjacentElement("afterend", btn);
-  return btn;
-}
-
-const geositeMoreBtn = makeMoreBtn(geositeListEl, () => {
-  geositeVirtual.showMore();
-  updateMoreButton(geositeVirtual, geositeMoreBtn);
-});
-const geoipMoreBtn = makeMoreBtn(geoipListEl, () => {
-  geoipVirtual.showMore();
-  updateMoreButton(geoipVirtual, geoipMoreBtn);
-});
-
-function updateMoreButton(virtual, btn) {
-  const hasMore = virtual.hasMore();
-  btn.style.display = hasMore ? "inline-flex" : "none";
-  if (hasMore) {
-    btn.textContent = t("showMoreCount", { count: virtual.getBatchSize() });
-  }
-}
 
 const renderGeositeListDebounced = debounce(
   (value) => renderGeositeList(value),
@@ -708,50 +647,33 @@ function normalizeMatchSelection() {
 function renderMatchSelect() {
   normalizeMatchSelection();
 
-  const options = [];
-  options.push(
-    `<option value="${MATCH_AUTO_VALUE}">${t("matchAuto")}</option>`
-  );
-  options.push(
-    `<optgroup label="${t("matchSpecialPolicies")}">${MATCH_POLICIES.map(
-      (p) => `<option value="${p.value}">${t(p.labelKey)}</option>`
-    ).join("")}</optgroup>`
-  );
-  const groupOptions = state.groups
-    .map((g) => g.name)
-    .filter(Boolean)
-    .map((n) => `<option value="group:${n}">${n}</option>`)
-    .join("");
-  options.push(
-    `<optgroup label="${t("groupsTitle")}">${
-      groupOptions || `<option value="" disabled>${t("noGroups")}</option>`
-    }</optgroup>`
-  );
+  fillActionSelect(matchSelectEl);
 
-  matchSelectEl.innerHTML = options.join("");
+  let current = "";
+  if (state.match.mode === "builtin") {
+    current = state.match.value || "";
+  } else if (state.match.mode === "group") {
+    current = state.match.value || "";
+  }
 
-  const currentValue =
-    state.match.mode === "group"
-      ? `group:${state.match.value}`
-      : state.match.mode === "builtin"
-      ? state.match.value
-      : MATCH_AUTO_VALUE;
-
-  const allowedValues = Array.from(matchSelectEl.options).map((o) => o.value);
-  matchSelectEl.value = allowedValues.includes(currentValue)
-    ? currentValue
-    : MATCH_AUTO_VALUE;
+  if (current && [...matchSelectEl.options].some((o) => o.value === current)) {
+    matchSelectEl.value = current;
+  } else {
+    matchSelectEl.value = "";
+  }
 }
 
 matchSelectEl.addEventListener("change", () => {
   const v = matchSelectEl.value;
-  if (v === MATCH_AUTO_VALUE) {
+
+  if (!v) {
     state.match = { mode: "auto", value: "" };
-  } else if (v.startsWith("group:")) {
-    state.match = { mode: "group", value: v.slice(6) };
-  } else {
+  } else if (v === "DIRECT" || v === "REJECT") {
     state.match = { mode: "builtin", value: v };
+  } else {
+    state.match = { mode: "group", value: v };
   }
+  renderRuleOrder();
 });
 
 function getMatchPolicyTarget() {
@@ -764,8 +686,8 @@ function getMatchPolicyTarget() {
     if (hasGroup) return state.match.value;
   }
 
-  const proxyGroup = state.groups.find((g) => g.name === "PROXY");
-  if (proxyGroup?.name) return proxyGroup.name;
+  const autoGroup = state.groups.find((g) => g.name === AUTO_GROUP_NAME);
+  if (autoGroup?.name) return autoGroup.name;
   if (state.groups.length) return state.groups[0].name;
   return "DIRECT";
 }
@@ -773,169 +695,65 @@ function getMatchPolicyTarget() {
 function renderRulesTargets() {
   renderGeositeList(document.getElementById("geositeSearch").value);
   renderGeoipList(document.getElementById("geoipSearch").value);
+  renderRuleProvidersPolicySelect();
+  renderRuleProviders();
+  rebuildRuleOrderFromState();
+}
+
+function renderRuleProvidersPolicySelect() {
+  const sel = document.getElementById("ruleProviderPolicy");
+  if (!sel) return;
+
+  const groups = state.groups.map((g) => g.name).filter(Boolean);
+
+  const options = [
+    `<option value="">${t("ruleActionPlaceholder")}</option>`,
+    `<option value="DIRECT">DIRECT</option>`,
+    `<option value="REJECT">REJECT</option>`,
+    ...groups.map((name) => `<option value="${name}">${name}</option>`),
+  ];
+
+  sel.innerHTML = options.join("");
 }
 
 function makeRuleRow(kind, name, pretty, query = "") {
   const map = kind === "geosite" ? state.rulesGeosite : state.rulesGeoip;
-  const drafts = state.ruleDrafts[kind];
-  const current = map.get(name) || { action: "", target: "" };
-  const draft = drafts.get(name) || current;
+  const current = map.get(name);
   const displayName = highlightMatch(pretty, query);
 
   const row = document.createElement("div");
   row.className = "item rule-item";
-  if (map.has(name)) row.classList.add("is-active");
+  if (current) row.classList.add("is-active");
+
+  row.dataset.kind = kind;
+  row.dataset.name = name;
+
   row.innerHTML = `
     <div class="rule-main">
       <span class="pill rule-kind">${kind.toUpperCase()}</span>
-      <span class="rule-name" title="${escapeHtml(
-        pretty
-      )}" data-full="${escapeHtml(pretty)}">${displayName}</span>
+      <span class="rule-name"
+            title="${escapeHtml(pretty)}"
+            data-full="${escapeHtml(pretty)}">${displayName}</span>
+      <button class="icon-btn"
+              data-role="rule-clear"
+              title="${t("ruleClearTitle")}">✕</button>
     </div>
     <div class="rule-actions">
-      <select data-action>
-        <option value="">${t("ruleActionPlaceholder")}</option>
-        <option value="DIRECT">DIRECT</option>
-        <option value="PROXY">${t("ruleActionProxy")}</option>
-        <option value="BLOCK">BLOCK</option>
-      </select>
-      <select data-target class="target-select is-hidden"></select>
-      <button class="icon-btn" data-clear title="${t(
-        "ruleClearTitle"
-      )}">✕</button>
+      <select data-role="rule-action"></select>
     </div>
   `;
 
-  const actionSel = row.querySelector("[data-action]");
-  const targetSel = row.querySelector("[data-target]");
+  const actionSel = row.querySelector('[data-role="rule-action"]');
+  fillActionSelect(actionSel);
 
-  function syncTargets(selectedTarget) {
-    const targets = state.groups.map((g) => g.name).filter(Boolean);
-    if (!targets.length) {
-      targetSel.innerHTML = `<option value="" disabled selected>${t(
-        "noGroups"
-      )}</option>`;
-      targetSel.value = "";
-      return;
-    }
-    targetSel.innerHTML = targets
-      .map((t) => `<option value="${t}">${t}</option>`)
-      .join("");
-    if (selectedTarget && targets.includes(selectedTarget)) {
-      targetSel.value = selectedTarget;
-    } else if (targets.includes(targetSel.value)) {
-    } else {
-      targetSel.value = targets[0];
-    }
+  if (current) {
+    let val = "";
+    if (current.action === "PROXY") val = current.target || "";
+    else if (current.action === "DIRECT") val = "DIRECT";
+    else if (current.action === "BLOCK" || current.target === "REJECT")
+      val = "REJECT";
+    actionSel.value = val;
   }
-
-  function setTargetVisibility(isProxy) {
-    targetSel.classList.toggle("is-hidden", !isProxy);
-  }
-
-  function persistDraft(action) {
-    const draftVal = {
-      action,
-      target: action === "PROXY" ? targetSel.value : "",
-    };
-    if (!action) {
-      drafts.delete(name);
-    } else drafts.set(name, draftVal);
-  }
-
-  function applyToActive() {
-    if (!map.has(name)) return;
-    const action = actionSel.value;
-    if (!action) {
-      map.delete(name);
-      renderRulesTargets();
-      return;
-    }
-    if (action === "DIRECT") {
-      map.set(name, { action, target: "DIRECT" });
-      renderRulesTargets();
-      return;
-    }
-    if (action === "BLOCK") {
-      map.set(name, { action, target: "REJECT" });
-      renderRulesTargets();
-      return;
-    }
-    syncTargets(targetSel.value);
-    const tgt = targetSel.value;
-    if (!tgt) {
-      setStatus("err", t("selectProxyGroup"));
-      actionSel.value = "";
-      map.delete(name);
-      renderRulesTargets();
-      return;
-    }
-    map.set(name, { action, target: tgt });
-    row.classList.add("is-active");
-  }
-
-  function getPreparedAction() {
-    const action = actionSel.value;
-    if (!action) return { action: "", target: "" };
-    if (action === "PROXY") {
-      syncTargets(targetSel.value);
-      return { action, target: targetSel.value };
-    }
-    return { action, target: action === "DIRECT" ? "DIRECT" : "REJECT" };
-  }
-
-  function toggleActivation() {
-    if (map.has(name)) {
-      map.delete(name);
-      row.classList.remove("is-active");
-      return;
-    }
-
-    const prepared = getPreparedAction();
-    if (!prepared.action) {
-      setStatus("err", t("selectRuleAction"));
-      return;
-    }
-    if (prepared.action === "PROXY" && !prepared.target) {
-      setStatus("err", t("selectProxyGroup"));
-      return;
-    }
-
-    map.set(name, prepared);
-    drafts.set(name, { action: prepared.action, target: prepared.target });
-    row.classList.add("is-active");
-  }
-
-  syncTargets(draft?.target);
-  actionSel.value = draft?.action || "";
-  setTargetVisibility(actionSel.value === "PROXY");
-
-  actionSel.addEventListener("change", () => {
-    const v = actionSel.value;
-    setTargetVisibility(v === "PROXY");
-    persistDraft(v);
-    applyToActive();
-  });
-  targetSel.addEventListener("change", () => {
-    persistDraft(actionSel.value);
-    applyToActive();
-  });
-  row.addEventListener("click", (e) => {
-    if (
-      e.target.tagName === "SELECT" ||
-      e.target.closest("select") ||
-      e.target.closest("button")
-    )
-      return;
-
-    toggleActivation();
-  });
-  row.querySelector("[data-clear]").addEventListener("click", (e) => {
-    e.stopPropagation();
-    map.delete(name);
-    drafts.delete(name);
-    renderRulesTargets();
-  });
 
   return row;
 }
@@ -947,35 +765,54 @@ function renderGeositeList(filter = "") {
   geositeFilterRaw = trimmed;
 
   if (filterChanged) {
+    geositeVisibleLimit = INITIAL_LIST_LIMIT;
     geositeListEl.scrollTop = 0;
   }
 
+  geositeListEl.innerHTML = "";
+
   if (!state.geosite.length) {
-    geositeCountEl.textContent = "0";
+    if (geositeCountEl) geositeCountEl.textContent = "0";
     const empty = document.createElement("div");
     empty.className = "empty-state";
     empty.innerHTML = t("fileNotLoaded");
-    geositeVirtual.showMessage(empty);
-    updateMoreButton(geositeVirtual, geositeMoreBtn);
+    geositeListEl.appendChild(empty);
+    if (geositeShowMoreBtn) geositeShowMoreBtn.style.display = "none";
     return;
   }
 
   const f = geositeFilterRaw.toLowerCase();
   const items = state.geosite.filter((x) => !f || x.toLowerCase().includes(f));
-  geositeCountEl.textContent = items.length;
+  if (geositeCountEl) geositeCountEl.textContent = items.length;
 
   if (!items.length) {
     const empty = document.createElement("div");
     empty.className = "empty-state";
     empty.textContent = t("noMatches", { query: geositeFilterRaw || "" });
-    geositeVirtual.showMessage(empty);
-    updateMoreButton(geositeVirtual, geositeMoreBtn);
+    geositeListEl.appendChild(empty);
+    if (geositeShowMoreBtn) geositeShowMoreBtn.style.display = "none";
     return;
   }
 
-  geositeVirtual.setItems(items);
-  geositeVirtual.render();
-  updateMoreButton(geositeVirtual, geositeMoreBtn);
+  const limit = Math.min(geositeVisibleLimit, items.length);
+  const visibleItems = items.slice(0, limit);
+
+  const frag = document.createDocumentFragment();
+  for (const name of visibleItems) {
+    frag.appendChild(makeRuleRow("geosite", name, name, geositeFilterRaw));
+  }
+  geositeListEl.appendChild(frag);
+
+  if (geositeShowMoreBtn) {
+    if (items.length > limit) {
+      geositeShowMoreBtn.style.display = "inline-flex";
+      const remaining = items.length - limit;
+      geositeShowMoreBtn.textContent =
+        t("showMoreCount", { count: remaining }) || t("showMore");
+    } else {
+      geositeShowMoreBtn.style.display = "none";
+    }
+  }
 }
 
 function renderGeoipList(filter = "") {
@@ -985,35 +822,58 @@ function renderGeoipList(filter = "") {
   geoipFilterRaw = trimmed;
 
   if (filterChanged) {
+    geoipVisibleLimit = INITIAL_LIST_LIMIT;
     geoipListEl.scrollTop = 0;
   }
 
+  geoipListEl.innerHTML = "";
+
   if (!state.geoip.length) {
-    geoipCountEl.textContent = "0";
+    if (geoipCountEl) geoipCountEl.textContent = "0";
     const empty = document.createElement("div");
     empty.className = "empty-state";
     empty.innerHTML = t("fileNotLoaded");
-    geoipVirtual.showMessage(empty);
-    updateMoreButton(geoipVirtual, geoipMoreBtn);
+    geoipListEl.appendChild(empty);
+    if (geoipShowMoreBtn) geoipShowMoreBtn.style.display = "none";
     return;
   }
 
   const f = geoipFilterRaw.toLowerCase();
   const items = state.geoip.filter((x) => !f || x.toLowerCase().includes(f));
-  geoipCountEl.textContent = items.length;
+  if (geoipCountEl) geoipCountEl.textContent = items.length;
 
   if (!items.length) {
     const empty = document.createElement("div");
     empty.className = "empty-state";
     empty.textContent = t("noMatches", { query: geoipFilterRaw || "" });
-    geoipVirtual.showMessage(empty);
-    updateMoreButton(geoipVirtual, geoipMoreBtn);
+    geoipListEl.appendChild(empty);
+    if (geoipShowMoreBtn) geoipShowMoreBtn.style.display = "none";
     return;
   }
 
-  geoipVirtual.setItems(items);
-  geoipVirtual.render();
-  updateMoreButton(geoipVirtual, geoipMoreBtn);
+  const limit = Math.min(geoipVisibleLimit, items.length);
+  const visibleItems = items.slice(0, limit);
+
+  const frag = document.createDocumentFragment();
+  for (const code of visibleItems) {
+    const flag = isoToFlag(code);
+    const pretty = flag ? `${flag}\u00A0${code}` : code;
+    frag.appendChild(makeRuleRow("geoip", code, pretty, geoipFilterRaw));
+  }
+  geoipListEl.appendChild(frag);
+
+  if (geoipShowMoreBtn) {
+    if (items.length > limit) {
+      geoipShowMoreBtn.style.display = "inline-flex";
+      const remaining = items.length - limit;
+      geoipShowMoreBtn.textContent =
+        t("showMoreCount", { count: remaining }) || t("showMore");
+    } else {
+      geoipShowMoreBtn.style.display = "none";
+    }
+  }
+
+  applyTwemoji(geoipListEl);
 }
 
 const geositeStatusEl = document.getElementById("geositeStatus");
@@ -1033,6 +893,87 @@ function updateGeoStatus(statusEl, received, total, count) {
     : t("loadingShort");
 }
 
+function applyRuleSelection(kind, name, value, row) {
+  const map = kind === "geosite" ? state.rulesGeosite : state.rulesGeoip;
+
+  if (!value) {
+    map.delete(name);
+    row.classList.remove("is-active");
+    return;
+  }
+
+  if (value === "DIRECT") {
+    map.set(name, { action: "DIRECT", target: "DIRECT" });
+  } else if (value === "REJECT") {
+    map.set(name, { action: "BLOCK", target: "REJECT" });
+  } else {
+    map.set(name, { action: "PROXY", target: value });
+  }
+
+  row.classList.add("is-active");
+}
+
+function handleRuleListChange(e) {
+  const sel = e.target.closest('select[data-role="rule-action"]');
+  if (!sel) return;
+
+  const row = sel.closest(".rule-item");
+  if (!row) return;
+
+  const kind = row.dataset.kind;
+  const name = row.dataset.name;
+  const value = sel.value;
+
+  applyRuleSelection(kind, name, value, row);
+  rebuildRuleOrderFromState();
+}
+
+function handleRuleListClick(e) {
+  const clearBtn = e.target.closest('[data-role="rule-clear"]');
+  if (clearBtn) {
+    const row = clearBtn.closest(".rule-item");
+    if (!row) return;
+    const kind = row.dataset.kind;
+    const name = row.dataset.name;
+    const map = kind === "geosite" ? state.rulesGeosite : state.rulesGeoip;
+    map.delete(name);
+    row.classList.remove("is-active");
+    rebuildRuleOrderFromState();
+    return;
+  }
+
+  const row = e.target.closest(".rule-item");
+  if (!row || e.target.closest("select")) return;
+
+  const kind = row.dataset.kind;
+  const name = row.dataset.name;
+  const map = kind === "geosite" ? state.rulesGeosite : state.rulesGeoip;
+  const sel = row.querySelector('select[data-role="rule-action"]');
+  if (!sel) return;
+
+  if (map.has(name)) {
+    map.delete(name);
+    row.classList.remove("is-active");
+  } else {
+    const value = sel.value;
+    if (!value) {
+      setStatus("err", t("selectRuleAction"));
+      return;
+    }
+    applyRuleSelection(kind, name, value, row);
+  }
+
+  rebuildRuleOrderFromState();
+}
+
+function initRuleListsDelegation() {
+  [geositeListEl, geoipListEl].forEach((list) => {
+    if (!list) return;
+    list.addEventListener("change", handleRuleListChange);
+    list.addEventListener("click", handleRuleListClick);
+  });
+}
+
 function loadGeo(kind) {
   const isGeosite = kind === "geosite";
   const url = isGeosite ? GEOSITE_URL : GEOIP_URL;
@@ -1044,7 +985,7 @@ function loadGeo(kind) {
   stateArr.length = 0;
   statusEl.textContent = t("loadingShort");
 
-  const worker = new Worker("geo-worker.js");
+  const worker = new Worker("scripts/geo-worker.js");
 
   worker.onmessage = ({ data }) => {
     if (data.type === "chunk") {
@@ -1085,18 +1026,18 @@ document
 
 document.getElementById("autoRulesBtn").addEventListener("click", () => {
   const autoRules = [
-    "GEOIP,private,DIRECT,no-resolve",
-    "IP-CIDR,45.121.184.0/22,DIRECT,no-resolve",
-    "IP-CIDR,103.10.124.0/23,DIRECT,no-resolve",
-    "IP-CIDR,103.28.54.0/23,DIRECT,no-resolve",
-    "IP-CIDR,146.66.152.0/21,DIRECT,no-resolve",
-    "IP-CIDR,155.133.224.0/19,DIRECT,no-resolve",
-    "IP-CIDR,162.254.192.0/21,DIRECT,no-resolve",
-    "IP-CIDR,185.25.180.0/22,DIRECT,no-resolve",
-    "IP-CIDR,192.69.96.0/22,DIRECT,no-resolve",
-    "IP-CIDR,205.196.6.0/24,DIRECT,no-resolve",
-    "IP-CIDR,208.64.200.0/22,DIRECT,no-resolve",
-    "IP-CIDR,208.78.164.0/22,DIRECT,no-resolve",
+    "GEOIP,private,DIRECT",
+    "IP-CIDR,45.121.184.0/22,DIRECT",
+    "IP-CIDR,103.10.124.0/23,DIRECT",
+    "IP-CIDR,103.28.54.0/23,DIRECT",
+    "IP-CIDR,146.66.152.0/21,DIRECT",
+    "IP-CIDR,155.133.224.0/19,DIRECT",
+    "IP-CIDR,162.254.192.0/21,DIRECT",
+    "IP-CIDR,185.25.180.0/22,DIRECT",
+    "IP-CIDR,192.69.96.0/22,DIRECT",
+    "IP-CIDR,205.196.6.0/24,DIRECT",
+    "IP-CIDR,208.64.200.0/22,DIRECT",
+    "IP-CIDR,208.78.164.0/22,DIRECT",
     "GEOSITE,reddit,DIRECT",
     "GEOSITE,steam,DIRECT",
     "GEOSITE,whatsapp,PROXY",
@@ -1110,7 +1051,7 @@ document.getElementById("autoRulesBtn").addEventListener("click", () => {
     "DOMAIN-SUFFIX,by,DIRECT",
     "DOMAIN-SUFFIX,xn--p1ai,DIRECT",
     "GEOSITE,category-gov-ru,DIRECT",
-    "GEOIP,RU,DIRECT,no-resolve",
+    "GEOIP,RU,DIRECT",
     `MATCH,${getMatchPolicyTarget()}`,
   ];
   const yaml = "rules:\n  - " + autoRules.join("\n  - ");
@@ -1118,63 +1059,228 @@ document.getElementById("autoRulesBtn").addEventListener("click", () => {
   const area = document.getElementById("rulesAdvancedText");
   area.value = yaml;
   if (!toggle.checked) {
-    toggle.checked = true;
-    toggle.dispatchEvent(new Event("change"));
+    toggle.click();
+  }
+  const subsToggle = document.getElementById("subsAdvancedToggle");
+  if (!subsToggle.checked) {
+    subsToggle.click();
   }
   setStatus("ok", t("autoRulesInserted"));
 });
 
-/* =========================================================
-   UI: Subscriptions
-========================================================= */
-const subsListEl = document.getElementById("subsList");
-function renderSubs() {
-  subsListEl.innerHTML = "";
-  state.subs.forEach((s, idx) => {
+const ruleProvidersListEl = document.getElementById("ruleProvidersList");
+
+function renderRuleProviders() {
+  if (!ruleProvidersListEl) return;
+
+  ruleProvidersListEl.innerHTML = "";
+
+  if (!state.ruleProviders.length) {
+    const empty = document.createElement("div");
+    empty.className = "hint";
+    empty.textContent = t("noRuleProviders") || "Нет провайдеров правил";
+    ruleProvidersListEl.appendChild(empty);
+    return;
+  }
+
+  state.ruleProviders.forEach((rp, idx) => {
     const row = document.createElement("div");
     row.className = "item";
+
     row.innerHTML = `
       <div style="display:grid;gap:4px;width:100%">
-        <div><b>${s.name}</b></div>
-        <small>${s.url}</small>
+        <div>
+          <b>${rp.name}</b>
+          <span class="pill">RULE-SET → ${rp.policy || "?"}</span>
+        </div>
+        <small>${rp.url}</small>
+        <small>
+          behavior: ${rp.behavior || "classical"}
+          · format: ${rp.format || "yaml"}
+        </small>
       </div>
       <button class="danger" data-del style="flex:0 0 auto">${t(
         "delete"
       )}</button>
     `;
+
     row.querySelector("[data-del]").addEventListener("click", () => {
+      state.ruleProviders.splice(idx, 1);
+      renderRuleProviders();
+      rebuildInternalStateDebounced();
+    });
+
+    ruleProvidersListEl.appendChild(row);
+  });
+  rebuildRuleOrderFromState();
+}
+
+const subsListEl = document.getElementById("subsList");
+function renderSubs() {
+  const list = document.getElementById("subsList");
+  if (!list) return;
+  list.innerHTML = "";
+
+  if (!state.subs.length) return;
+
+  const groupNames = [
+    "GLOBAL",
+    ...(state.groups || []).map((g) => g.name).filter(Boolean),
+  ];
+
+  state.subs.forEach((sub, i) => {
+    const item = document.createElement("div");
+    item.className = "item";
+
+    item.innerHTML = `
+      <label style="gap:10px; align-items:center;">
+        <div style="flex:1; min-width:0;">
+          <div><b>${sub.name}</b></div>
+          <small style="opacity:.8; word-break:break-all;">${sub.url}</small>
+        </div>
+
+<select data-sub-proxy-mode="${i}">
+          <option value="DIRECT" ${
+            sub.fetchMode === "DIRECT" ? "selected" : ""
+          }>DIRECT</option>
+          <option value="PROXY" ${
+            sub.fetchMode === "PROXY" ? "selected" : ""
+          }>via Proxy</option>
+        </select>
+
+<select data-sub-proxy-name="${i}"
+                style="max-width:140px; ${
+                  sub.fetchMode === "PROXY" ? "" : "display:none;"
+                }">
+          ${groupNames
+            .map(
+              (n) =>
+                `<option value="${n}" ${
+                  sub.fetchProxy === n ? "selected" : ""
+                }>${n}</option>`
+            )
+            .join("")}
+        </select>
+      <button class="danger" data-sub-del style="flex:0 0 auto">${t(
+        "delete"
+      )}</button>
+      </label>
+    `;
+
+    list.appendChild(item);
+  });
+
+  list.querySelectorAll("[data-sub-proxy-mode]").forEach((sel) => {
+    sel.addEventListener("change", (e) => {
+      const idx = +e.target.dataset.subProxyMode;
+      state.subs[idx].fetchMode = e.target.value;
+
+      renderSubs();
+      rebuildInternalStateDebounced();
+    });
+  });
+
+  list.querySelectorAll("[data-sub-proxy-name]").forEach((sel) => {
+    sel.addEventListener("change", (e) => {
+      const idx = +e.target.dataset.subProxyName;
+      state.subs[idx].fetchProxy = e.target.value;
+      rebuildInternalStateDebounced();
+    });
+  });
+
+  list.querySelectorAll("[data-sub-del]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const idx = +e.target.dataset.subDel;
       state.subs.splice(idx, 1);
       renderSubs();
       rebuildInternalStateDebounced();
     });
-    subsListEl.appendChild(row);
   });
-  if (!state.subs.length) {
-    const empty = document.createElement("div");
-    empty.className = "hint";
-    empty.textContent = t("noSubs");
-    subsListEl.appendChild(empty);
-  }
 }
 
 document.getElementById("addSubBtn").addEventListener("click", () => {
-  const url = document.getElementById("subsUrl").value.trim();
+  const urlInput = document.getElementById("subsUrl");
+  const url = urlInput.value.trim();
   if (!url) return;
+
+  const fetchMode = document.getElementById("subsFetchMode")?.value || "DIRECT";
+  const skipCertVerify = !!document.getElementById("subsSkipCert")?.checked;
+
   const name = "sub-" + (state.subs.length + 1);
-  state.subs.push({ name, url, interval: 3600 });
-  document.getElementById("subsUrl").value = "";
+
+  state.subs.push({
+    name,
+    url,
+    interval: 3600,
+    fetchMode,
+    fetchProxy: "GLOBAL",
+    skipCertVerify,
+  });
+
+  urlInput.value = "";
   renderSubs();
   rebuildInternalStateDebounced();
 });
 
-/* =========================================================
-   Advanced toggles
-========================================================= */
+document.getElementById("addRuleProviderBtn").addEventListener("click", () => {
+  const nameInput = document.getElementById("ruleProviderName");
+  const urlInput = document.getElementById("ruleProviderUrl");
+  const behaviorSel = document.getElementById("ruleProviderBehavior");
+  const policySel = document.getElementById("ruleProviderPolicy");
+
+  const name = nameInput.value.trim();
+  const url = urlInput.value.trim();
+  const behavior = behaviorSel.value || "classical";
+  const policy = policySel.value;
+
+  if (!name || !url) {
+    setStatus("err", t("ruleProvidersNameUrlRequired") || "Нужно имя и URL");
+    return;
+  }
+  if (!policy) {
+    setStatus("err", t("selectProxyGroup"));
+    return;
+  }
+
+  if (state.ruleProviders.some((rp) => rp.name === name)) {
+    setStatus("err", t("ruleProvidersNameExists") || "Такое имя уже есть");
+    return;
+  }
+
+  state.ruleProviders.push({
+    name,
+    url,
+    behavior,
+    policy,
+    type: "http",
+    format: "yaml",
+    path: `./rules/${name}.yaml`,
+    interval: 600,
+  });
+
+  nameInput.value = "";
+  urlInput.value = "";
+
+  renderRuleProviders();
+  rebuildInternalStateDebounced();
+});
+
 function bindAdvanced(toggleId, areaId) {
   const t = document.getElementById(toggleId);
   const a = document.getElementById(areaId);
+  const track = t.nextElementSibling;
+
   function sync() {
-    a.style.display = t.checked ? "block" : "none";
+    const on = t.checked;
+    a.style.display = on ? "block" : "none";
+    if (track) {
+      track.classList.toggle("is-on", on);
+      if (track) {
+        track.classList.toggle("is-on", on);
+        track.offsetWidth;
+      }
+      track.offsetWidth;
+    }
   }
   t.addEventListener("change", sync);
   sync();
@@ -1187,17 +1293,14 @@ renderSubs();
 renderGroups();
 renderRulesTargets();
 
-/* =========================================================
-   YAML for groups / rules / subs
-========================================================= */
 function ensureAutoProxyGroup() {
   if (!state.proxies.length && !state.subs.length) return;
 
-  let g = state.groups.find((g) => g.name === "PROXY");
+  let g = state.groups.find((g) => g.name === AUTO_GROUP_NAME);
 
   if (!g) {
     g = {
-      name: "PROXY",
+      name: AUTO_GROUP_NAME,
       type: "select",
       icon: "",
       proxies: [],
@@ -1262,45 +1365,123 @@ function emitRulesYaml() {
   if (document.getElementById("rulesAdvancedToggle").checked) {
     return document.getElementById("rulesAdvancedText").value.trim() + "\n";
   }
+
   const lines = [];
   emitLine(lines, "rules:");
-  for (const [name, r] of state.rulesGeosite.entries()) {
-    emitLine(lines, `- GEOSITE,${name},${r.target}`, 2);
-  }
-  for (const [code, r] of state.rulesGeoip.entries()) {
-    emitLine(lines, `- GEOIP,${code},${r.target},no-resolve`, 2);
-  }
-  emitLine(lines, `- MATCH,${getMatchPolicyTarget()}`, 2);
+
+  const entries =
+    Array.isArray(state.ruleOrder) && state.ruleOrder.length
+      ? state.ruleOrder
+      : buildRuleEntriesArray();
+
+  entries.forEach((e) => {
+    switch (e.kind) {
+      case "GEOSITE":
+        emitLine(lines, `- GEOSITE,${e.key},${e.policy}`, 2);
+        break;
+      case "GEOIP":
+        emitLine(lines, `- GEOIP,${e.key},${e.policy}`, 2);
+        break;
+      case "RULE-SET":
+        emitLine(lines, `- RULE-SET,${e.key},${e.policy}`, 2);
+        break;
+      case "MANUAL":
+        emitLine(lines, `- ${e.key},${e.policy}`, 2);
+        break;
+      case "MATCH":
+        emitLine(lines, `- MATCH,${getMatchPolicyTarget()}`, 2);
+        break;
+    }
+  });
 
   return lines.join("\n") + "\n";
+}
+
+function getOrderedRuleEntries() {
+  const raw = buildRuleEntriesArray();
+  const byId = new Map(raw.map((e) => [e.id, e]));
+
+  const order = Array.isArray(state.ruleOrder) ? state.ruleOrder : [];
+  const result = [];
+
+  for (const id of order) {
+    const e = byId.get(id);
+    if (!e) continue;
+    result.push(e);
+    byId.delete(id);
+  }
+
+  for (const e of byId.values()) {
+    result.push(e);
+  }
+
+  return result;
 }
 
 function emitSubsYaml() {
-  if (document.getElementById("subsAdvancedToggle").checked) {
-    return document.getElementById("subsAdvancedText").value.trim() + "\n";
+  const advToggle = document.getElementById("subsAdvancedToggle");
+  const advText = document.getElementById("subsAdvancedText");
+
+  if (advToggle?.checked) {
+    return advText?.value?.trim() || "";
   }
+
   if (!state.subs.length) return "";
-  const lines = [];
-  emitLine(lines, "proxy-providers:");
-  state.subs.forEach((s, i) => {
-    emitLine(lines, `${s.name}:`, 2);
-    emitLine(lines, `type: http`, 4);
-    emitLine(lines, `url: ${yamlQuote(s.url)}`, 4);
-    emitLine(lines, `interval: ${s.interval}`, 4, false);
-    emitLine(lines, `path: ./providers/${s.name}.yaml`, 4, false);
-    emitLine(lines, `health-check:`, 4);
-    emitLine(lines, `enable: true`, 6);
-    emitLine(lines, `url: http://www.gstatic.com/generate_204`, 6, false);
-    emitLine(lines, `interval: 600`, 6, false);
-    if (i !== state.subs.length - 1) emitLine(lines, "");
+
+  let out = "proxy-providers:\n";
+
+  state.subs.forEach((sub) => {
+    out += `  ${sub.name}:\n`;
+    out += `    type: http\n`;
+    out += `    url: "${sub.url}"\n`;
+    out += `    interval: ${sub.interval || 3600}\n`;
+    out += `    path: ./providers/${sub.name}.yaml\n`;
+
+    if (sub.fetchMode === "PROXY" && sub.fetchProxy) {
+      out += `    proxy: ${sub.fetchProxy}\n`;
+    }
+
+    out += `    health-check:\n`;
+    out += `      enable: true\n`;
+    out += `      url: http://www.gstatic.com/generate_204\n`;
+    out += `      interval: 600\n`;
   });
+
+  return out.trim();
+}
+
+function emitRuleProvidersYaml() {
+  if (!state.ruleProviders || !state.ruleProviders.length) return "";
+
+  const lines = [];
+  emitLine(lines, "rule-providers:");
+
+  state.ruleProviders.forEach((rp, i) => {
+    emitLine(lines, `${rp.name}:`, 2);
+    emitLine(lines, `type: ${rp.type || "http"}`, 4);
+    if (rp.path) {
+      emitLine(lines, `path: ${yamlQuote(rp.path)}`, 4);
+    }
+    emitLine(lines, `url: ${yamlQuote(rp.url)}`, 4);
+    if (rp.interval != null) {
+      emitLine(lines, `interval: ${rp.interval}`, 4, false);
+    }
+    if (rp.proxy) {
+      emitLine(lines, `proxy: ${rp.proxy}`, 4);
+    }
+    if (rp.behavior) {
+      emitLine(lines, `behavior: ${rp.behavior}`, 4);
+    }
+    if (rp.format) {
+      emitLine(lines, `format: ${rp.format}`, 4, false);
+    }
+    if (i !== state.ruleProviders.length - 1) emitLine(lines, "");
+  });
+
   return lines.join("\n") + "\n";
 }
 
-/* =========================================================
-   Build action
-========================================================= */
-const rebuildInternalStateDebounced = debounce(rebuildInternalState, 400);
+const rebuildInternalStateDebounced = debounce(rebuildInternalState, 700);
 
 function rebuildInternalState() {
   const { proxies } = parser.parseMany(document.getElementById("input").value);
@@ -1381,25 +1562,32 @@ function buildConfig() {
 
   const groupsYaml = emitGroupsYaml();
   const subsYaml = emitSubsYaml();
+  const ruleProvidersYaml = emitRuleProvidersYaml();
   const rulesYaml = emitRulesYaml();
 
-  if (groupsYaml) yaml += (yaml ? "\n" : "") + groupsYaml.trim() + "\n";
   if (subsYaml) yaml += (yaml ? "\n" : "") + subsYaml.trim() + "\n";
+  if (groupsYaml) yaml += (yaml ? "\n" : "") + groupsYaml.trim() + "\n";
+  if (ruleProvidersYaml)
+    yaml += (yaml ? "\n" : "") + ruleProvidersYaml.trim() + "\n";
   if (rulesYaml) yaml += (yaml ? "\n" : "") + rulesYaml.trim() + "\n";
 
   if (!yaml.trim()) {
+    const outputEl = document.getElementById("output");
+    outputEl.textContent = t("outputPlaceholder");
+    outputEl.dataset.placeholder = "true";
+
     if (errors.length) {
       setStatus("err", errors[0].err || t("emptyStatus"));
-      return;
+    } else {
+      setStatus("err", t("emptyStatus"));
     }
-    document.getElementById("output").textContent = t("nothingToBuild");
-    setStatus("err", t("emptyStatus"));
     return;
   }
 
   const outputEl = document.getElementById("output");
   outputEl.textContent = yaml;
   delete outputEl.dataset.placeholder;
+  outputEl.removeAttribute("data-placeholder");
 
   if (errors.length) {
     setStatus(
@@ -1427,9 +1615,6 @@ function buildConfig() {
 
 document.getElementById("convertBtn").addEventListener("click", buildConfig);
 
-/* =========================================================
-   Demo + misc buttons
-========================================================= */
 document.getElementById("pasteDemoBtn").addEventListener("click", () => {
   document.getElementById("input").value = [
     "vless://11111111-2222-3333-4444-555555555555@host.example.com:443?type=ws&security=tls&path=%2Fwebsocket#VLESS_WS_TLS",
@@ -1441,7 +1626,9 @@ document.getElementById("pasteDemoBtn").addEventListener("click", () => {
 
 document.getElementById("clearBtn").addEventListener("click", () => {
   document.getElementById("input").value = "";
-  document.getElementById("output").textContent = "";
+  const out = document.getElementById("output");
+  out.textContent = t("outputPlaceholder");
+  out.dataset.placeholder = "true";
   setStatus(null, t("clearedStatus"));
 });
 
@@ -1489,17 +1676,582 @@ document.getElementById("input").addEventListener("input", () => {
   rebuildInternalStateDebounced();
 });
 
-/* =========================================================
-   Initial render + language init
-========================================================= */
+const twemojiOptions = {
+  base: "https://raw.githubusercontent.com/twitter/twemoji/v14.0.2/assets/",
+  folder: "svg",
+  ext: ".svg",
+  className: "emoji",
+};
+
+function applyTwemoji(scope) {
+  if (!scope || typeof twemoji === "undefined") return;
+  try {
+    twemoji.parse(scope, twemojiOptions);
+  } catch (e) {
+    console.warn("twemoji.parse failed", e);
+  }
+}
+function debounce(fn, delay = 120) {
+  let t;
+  return (...args) => {
+    clearTimeout(t);
+    t = setTimeout(() => fn(...args), delay);
+  };
+}
+
+function initManualRules() {
+  const typeEl = document.getElementById("manualRuleType");
+  const valueEl = document.getElementById("manualRuleValue");
+  const actionEl = document.getElementById("manualRuleAction");
+  const addBtn = document.getElementById("addManualRuleBtn");
+
+  if (!typeEl || !valueEl || !actionEl || !addBtn) return;
+
+  fillActionSelect(actionEl);
+
+  addBtn.addEventListener("click", () => {
+    const type = typeEl.value.trim();
+    const rawValue = valueEl.value.trim();
+    const actionValue = actionEl.value.trim();
+
+    if (!type || !rawValue || !actionValue) {
+      alert(t("manualRulesFillAll"));
+      return;
+    }
+
+    const normalized = normalizeManualRule(type, rawValue);
+    if (!normalized.ok) {
+      alert(normalized.error);
+      return;
+    }
+
+    let action = "";
+    let target = "";
+
+    if (actionValue === "DIRECT") {
+      action = "DIRECT";
+      target = "";
+    } else if (actionValue === "REJECT") {
+      action = "BLOCK";
+      target = "REJECT";
+    } else {
+      action = "PROXY";
+      target = actionValue;
+    }
+
+    state.manualRules.push({
+      id: Date.now() + Math.random().toString(16).slice(2),
+      type,
+      value: normalized.value,
+      action,
+      target,
+    });
+
+    valueEl.value = "";
+    actionEl.value = "";
+
+    renderManualRules();
+  });
+
+  renderManualRules();
+  rebuildRuleOrderFromState();
+}
+
+function renderManualRules() {
+  const listEl = document.getElementById("manualRulesList");
+  if (!listEl) return;
+
+  listEl.innerHTML = "";
+
+  const rules = state.manualRules || [];
+
+  if (!rules.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.textContent = t("manualRulesEmpty");
+    listEl.appendChild(empty);
+    return;
+  }
+
+  rules.forEach((rule) => {
+    const item = document.createElement("div");
+    item.className = "rule-item";
+
+    const main = document.createElement("div");
+    main.className = "rule-main";
+
+    const kind = document.createElement("span");
+    kind.className = "pill rule-kind";
+    kind.textContent = rule.type;
+
+    let policy = "";
+    if (rule.action === "DIRECT") policy = "DIRECT";
+    else if (rule.action === "BLOCK" || rule.target === "REJECT")
+      policy = "REJECT";
+    else if (rule.action === "PROXY") policy = rule.target || "PROXY";
+
+    const name = document.createElement("div");
+    name.className = "rule-name";
+    const payload = `${rule.type},${rule.value},${policy}`;
+    name.textContent = payload;
+    name.setAttribute("data-full", payload);
+
+    main.appendChild(kind);
+    main.appendChild(name);
+
+    const actions = document.createElement("div");
+    actions.className = "rule-actions";
+
+    const removeBtn = document.createElement("button");
+    removeBtn.className = "icon-btn";
+    removeBtn.type = "button";
+    removeBtn.textContent = "✕";
+    removeBtn.title = t("manualRulesDelete");
+
+    removeBtn.addEventListener("click", () => {
+      const idx = state.manualRules.findIndex((r) => r.id === rule.id);
+      if (idx !== -1) {
+        state.manualRules.splice(idx, 1);
+        renderManualRules();
+        rebuildRuleOrderFromState();
+      }
+    });
+
+    actions.appendChild(removeBtn);
+
+    item.appendChild(main);
+    item.appendChild(actions);
+
+    listEl.appendChild(item);
+  });
+}
+
+function getManualRulesYaml() {
+  return state.manualRules.map((r) => {
+    let policy = "";
+    if (r.action === "DIRECT") policy = "DIRECT";
+    else if (r.action === "BLOCK" || r.target === "REJECT") policy = "REJECT";
+    else if (r.action === "PROXY") policy = r.target;
+
+    return `${r.type},${r.value},${policy}`;
+  });
+}
+
+function stripSchemeAndPath(s) {
+  return s
+    .replace(/^\s*https?:\/\//i, "")
+    .replace(/^\s*ws?:\/\//i, "")
+    .split(/[\/\?#]/)[0]
+    .trim();
+}
+
+function isValidDomain(d) {
+  if (!d || d.length > 253) return false;
+  const parts = d.split(".");
+  if (parts.length < 2) return false;
+  for (const p of parts) {
+    if (!p || p.length > 63) return false;
+    if (!/^[a-z0-9-]+$/i.test(p)) return false;
+    if (/^-|-$/.test(p)) return false;
+  }
+  return true;
+}
+
+function normalizeDomain(type, raw) {
+  let v = stripSchemeAndPath(raw).toLowerCase();
+  v = v.replace(/\s+/g, "");
+
+  if (v.startsWith("*.")) v = v.slice(2);
+
+  if (!isValidDomain(v)) {
+    return {
+      ok: false,
+      error: t("manualErrorInvalidDomain", { value: raw }),
+    };
+  }
+
+  v = v.replace(/\.$/, "");
+  return { ok: true, value: v };
+}
+
+function normalizeKeyword(raw) {
+  let v = stripSchemeAndPath(raw).toLowerCase().trim();
+  v = v.replace(/\s+/g, "");
+  if (!v) {
+    return { ok: false, error: t("manualErrorEmptyKeyword") };
+  }
+  if (/[\/\\]/.test(v)) {
+    return {
+      ok: false,
+      error: t("manualErrorKeywordSlash"),
+    };
+  }
+  return { ok: true, value: v };
+}
+
+function isValidIPv4(ip) {
+  const m = ip.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!m) return false;
+  for (let i = 1; i <= 4; i++) {
+    const n = +m[i];
+    if (n < 0 || n > 255) return false;
+  }
+  return true;
+}
+
+function normalizeCidr(raw) {
+  let v = raw.trim();
+
+  if (isValidIPv4(v)) {
+    return { ok: true, value: `${v}/32` };
+  }
+
+  const m = v.match(/^(.+?)\/(\d{1,2})$/);
+  if (!m) {
+    return {
+      ok: false,
+      error: t("manualErrorInvalidCidrIp", { value: raw }),
+    };
+  }
+  const ip = m[1].trim();
+  const mask = +m[2];
+  if (!isValidIPv4(ip)) {
+    return {
+      ok: false,
+      error: t("manualErrorInvalidIPv4", { value: ip }),
+    };
+  }
+  if (!Number.isInteger(mask) || mask < 0 || mask > 32) {
+    return {
+      ok: false,
+      error: t("manualErrorMaskRange", { value: raw }),
+    };
+  }
+  return { ok: true, value: `${ip}/${mask}` };
+}
+
+function normalizeAsn(raw) {
+  const v = raw.trim();
+  if (!/^\d+$/.test(v)) {
+    return {
+      ok: false,
+      error: t("manualErrorAsnNotNumber", { value: raw }),
+    };
+  }
+}
+
+function normalizeProcessName(raw) {
+  let v = raw.trim().replace(/^"+|"+$/g, "");
+  if (!v) {
+    return { ok: false, error: t("manualErrorProcessNameEmpty") };
+  }
+  if (/[\/\\:]/.test(v)) {
+    return {
+      ok: false,
+      error: t("manualErrorProcessNamePath"),
+    };
+  }
+  return { ok: true, value: v };
+}
+
+function normalizeProcessPath(raw) {
+  let v = raw.trim().replace(/^"+|"+$/g, "");
+  if (!v) {
+    return { ok: false, error: t("manualErrorProcessPathEmpty") };
+  }
+  const looksWindows = /^[a-zA-Z]:\\/.test(v) || v.startsWith("\\\\");
+  const looksUnix = v.startsWith("/");
+  if (!looksWindows && !looksUnix) {
+    return {
+      ok: false,
+      error: t("manualErrorProcessPathFull"),
+    };
+  }
+}
+
+function normalizeManualRule(type, rawValue) {
+  switch (type) {
+    case "DOMAIN-SUFFIX":
+      return normalizeDomain(type, rawValue);
+    case "DOMAIN-KEYWORD":
+      return normalizeKeyword(rawValue);
+    case "IP-CIDR":
+      return normalizeCidr(rawValue);
+    case "IP-ASN":
+      return normalizeAsn(rawValue);
+    case "PROCESS-NAME":
+      return normalizeProcessName(rawValue);
+    case "PROCESS-PATH":
+      return normalizeProcessPath(rawValue);
+    default:
+      return { ok: true, value: rawValue.trim() };
+  }
+}
+
+function buildRuleEntriesArray() {
+  const entries = [];
+
+  for (const [name, r] of state.rulesGeosite.entries()) {
+    entries.push({
+      id: `GEOSITE:${name}`,
+      kind: "GEOSITE",
+      key: name,
+      policy: r.target,
+    });
+  }
+
+  for (const [code, r] of state.rulesGeoip.entries()) {
+    entries.push({
+      id: `GEOIP:${code}`,
+      kind: "GEOIP",
+      key: code,
+      policy: r.target,
+    });
+  }
+
+  if (state.ruleProviders && state.ruleProviders.length) {
+    state.ruleProviders.forEach((rp) => {
+      if (!rp.policy) return;
+      entries.push({
+        id: `RULE-SET:${rp.name}`,
+        kind: "RULE-SET",
+        key: rp.name,
+        policy: rp.policy,
+      });
+    });
+  }
+
+  (state.manualRules || []).forEach((r) => {
+    let policy = "";
+    if (r.action === "DIRECT") policy = "DIRECT";
+    else if (r.action === "BLOCK" || r.target === "REJECT") policy = "REJECT";
+    else if (r.action === "PROXY") policy = r.target || "PROXY";
+
+    entries.push({
+      id: `MANUAL:${r.id}`,
+      kind: "MANUAL",
+      key: `${r.type},${r.value}`,
+      policy,
+    });
+  });
+
+  entries.push({
+    id: "MATCH:__default__",
+    kind: "MATCH",
+    key: "MATCH",
+    policy: getMatchPolicyTarget(),
+  });
+
+  return entries;
+}
+
+function rebuildRuleOrderFromState() {
+  const raw = buildRuleEntriesArray();
+
+  if (!raw.length) {
+    state.ruleOrder = [];
+    renderRuleOrder();
+    return;
+  }
+
+  const matchEntry = raw.find((e) => e.kind === "MATCH") || null;
+  const nonMatchRaw = raw.filter((e) => e.kind !== "MATCH");
+
+  const byId = new Map(nonMatchRaw.map((e) => [e.id, e]));
+
+  const prev = Array.isArray(state.ruleOrder) ? state.ruleOrder : [];
+  const next = [];
+
+  for (const old of prev) {
+    if (old.kind === "MATCH") continue;
+    const fresh = byId.get(old.id);
+    if (fresh) {
+      next.push(fresh);
+      byId.delete(old.id);
+    }
+  }
+
+  for (const e of byId.values()) {
+    next.push(e);
+  }
+
+  if (matchEntry) {
+    next.push(matchEntry);
+  }
+
+  state.ruleOrder = next;
+  renderRuleOrder();
+}
+
+function renderRuleOrder() {
+  if (!ruleOrderListEl) return;
+
+  ruleOrderListEl.innerHTML = "";
+
+  const items =
+    Array.isArray(state.ruleOrder) && state.ruleOrder.length
+      ? state.ruleOrder
+      : buildRuleEntriesArray();
+
+  if (!items.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.textContent = t("ruleOrderEmpty");
+    ruleOrderListEl.appendChild(empty);
+    return;
+  }
+
+  const matchKind = "MATCH";
+
+  items.forEach((entry, index) => {
+    const row = document.createElement("div");
+    row.className = "rule-order-item";
+    if (entry.kind === matchKind) {
+      row.classList.add("rule-order-match");
+    }
+
+    let kindLabel = "";
+    switch (entry.kind) {
+      case "GEOSITE":
+        kindLabel = t("ruleOrderKindGeosite");
+        break;
+      case "GEOIP":
+        kindLabel = t("ruleOrderKindGeoip");
+        break;
+      case "RULE-SET":
+        kindLabel = t("ruleOrderKindRuleSet");
+        break;
+      case "MANUAL":
+        kindLabel = t("ruleOrderKindManual");
+        break;
+      case "MATCH":
+        kindLabel = t("ruleOrderKindMatch");
+        break;
+    }
+
+    let label = "";
+    if (entry.kind !== matchKind) {
+      if (entry.kind === "GEOIP") {
+        const code = String(entry.key ?? "");
+        const flag = isoToFlag(code);
+        const pretty = flag ? `${flag}\u00A0${code}` : code;
+        label = escapeHtml(pretty);
+      } else {
+        label = escapeHtml(String(entry.key ?? ""));
+      }
+    }
+
+    row.innerHTML = `
+      <div class="rule-order-main">
+        <span class="pill">${kindLabel}</span>
+        ${label ? `<span class="rule-order-label">${label}</span>` : ""}
+      </div>
+      <div class="rule-order-actions"></div>
+    `;
+
+    const actions = row.querySelector(".rule-order-actions");
+
+    if (entry.kind !== matchKind) {
+      const downBtn = document.createElement("button");
+      downBtn.type = "button";
+      downBtn.className = "icon-btn move-down";
+      downBtn.title = t("ruleOrderMoveDown");
+      downBtn.textContent = "↓";
+      downBtn.addEventListener("click", () => moveRuleOrder(index, +1));
+
+      const upBtn = document.createElement("button");
+      upBtn.type = "button";
+      upBtn.className = "icon-btn move-up";
+      upBtn.title = t("ruleOrderMoveUp");
+      upBtn.textContent = "↑";
+      upBtn.addEventListener("click", () => moveRuleOrder(index, -1));
+
+      const bottomBtn = document.createElement("button");
+      bottomBtn.type = "button";
+      bottomBtn.className = "icon-btn move-bottom";
+      bottomBtn.title = t("ruleOrderMoveBottom") || "Move to bottom";
+      bottomBtn.textContent = "⇣";
+      bottomBtn.addEventListener("click", () =>
+        moveRuleOrderToEdge(index, "bottom")
+      );
+
+      const topBtn = document.createElement("button");
+      topBtn.type = "button";
+      topBtn.className = "icon-btn move-top";
+      topBtn.title = t("ruleOrderMoveTop") || "Move to top";
+      topBtn.textContent = "⇡";
+      topBtn.addEventListener("click", () => moveRuleOrderToEdge(index, "top"));
+
+      actions.appendChild(downBtn);
+      actions.appendChild(bottomBtn);
+      actions.appendChild(topBtn);
+      actions.appendChild(upBtn);
+    }
+
+    ruleOrderListEl.appendChild(row);
+  });
+
+  applyTwemoji(ruleOrderListEl);
+}
+
+function moveRuleOrder(index, delta) {
+  const items =
+    Array.isArray(state.ruleOrder) && state.ruleOrder.length
+      ? state.ruleOrder
+      : (state.ruleOrder = buildRuleEntriesArray());
+
+  const item = items[index];
+  if (!item) return;
+
+  if (item.kind === "MATCH") return;
+
+  const movableCount = items.filter((e) => e.kind !== "MATCH").length;
+
+  let to = index + delta;
+  if (to < 0 || to >= movableCount) return;
+
+  items.splice(index, 1);
+  items.splice(to, 0, item);
+
+  renderRuleOrder();
+}
+
+function moveRuleOrderToEdge(index, direction) {
+  const items =
+    Array.isArray(state.ruleOrder) && state.ruleOrder.length
+      ? state.ruleOrder
+      : (state.ruleOrder = buildRuleEntriesArray());
+
+  const item = items[index];
+  if (!item) return;
+
+  if (item.kind === "MATCH") return;
+
+  const movable = items.filter((e) => e.kind !== "MATCH");
+  const movableCount = movable.length;
+  if (!movableCount) return;
+
+  const target = direction === "top" ? 0 : movableCount - 1;
+  if (index === target) return;
+
+  items.splice(index, 1);
+  items.splice(target, 0, item);
+
+  renderRuleOrder();
+}
 
 function initApp() {
+  ruleOrderListEl = document.getElementById("rulesOrderList");
   setupLanguageSelector();
   applyTranslations();
   renderSubs();
   renderGroups();
   renderRulesTargets();
   syncDynamicTexts();
+  applyTwemoji(document.body);
+  initManualRules();
+  rebuildRuleOrderFromState();
+  initRuleListsDelegation();
 }
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", initApp);

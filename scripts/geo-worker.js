@@ -35,12 +35,7 @@ self.onmessage = async (event) => {
   try {
     const res = await fetch(url);
     if (!res.ok) {
-      throw new Error(
-        `Не удалось загрузить ${url} (HTTP ${res.status})` +
-          (self.location.protocol === "file:"
-            ? " — браузеры часто блокируют file://, лучше открыть через локальный http-сервер."
-            : "")
-      );
+      throw new Error(`Could not load ${url} (HTTP ${res.status})`);
     }
 
     total = Number(res.headers.get("content-length")) || null;

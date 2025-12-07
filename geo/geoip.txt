@@ -44,6 +44,8 @@ ch
 ci
 ck
 cl
+cloudflare
+cloudfront
 cm
 cn
 co
@@ -67,6 +69,8 @@ eh
 er
 es
 et
+facebook
+fastly
 fi
 fj
 fk
@@ -84,6 +88,7 @@ gi
 gl
 gm
 gn
+google
 gp
 gq
 gr
@@ -160,6 +165,7 @@ mz
 na
 nc
 ne
+netflix
 nf
 ng
 ni
@@ -214,7 +220,7 @@ sy
 sz
 tc
 td
-test
+telegram
 tf
 tg
 th
@@ -224,10 +230,12 @@ tl
 tm
 tn
 to
+tor
 tr
 tt
 tv
 tw
+twitter
 tz
 ua
 ug
@@ -250,4 +258,3 @@ yt
 za
 zm
 zw
-zz

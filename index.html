@@ -4,20 +4,21 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Mihomo Constructor</title>
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles/fonts.css" />
+    <link rel="stylesheet" href="styles/styles.css" />
     <link
       rel="icon"
-      href="favicon/favicon.svg"
+      href="/favicon/favicon.svg"
       type="image/svg+xml"
       sizes="any"
     />
-    <link rel="icon" href="favicon/favicon.ico" sizes="any" />
+    <link rel="icon" href="/favicon/favicon.ico" sizes="any" />
     <link
       rel="apple-touch-icon"
       sizes="180x180"
-      href="favicon/apple-touch-icon.png"
+      href="/favicon/apple-touch-icon.png"
     />
-    <link rel="manifest" href="favicon/site.webmanifest" />
+    <link rel="manifest" href="/favicon/site.webmanifest" />
     <meta
       name="theme-color"
       content="#ffffff"
@@ -98,7 +99,6 @@
             </div>
           </div>
         </div>
-
         <div class="body">
           <div class="stack">
             <div class="section">
@@ -145,6 +145,10 @@ ss://...
                     data-i18n="subsPlaceholder"
                     data-i18n-attr="placeholder"
                   />
+                  <select id="subsFetchMode" title="How to fetch subscription">
+                    <option value="DIRECT">DIRECT</option>
+                    <option value="PROXY">via Proxy</option>
+                  </select>
                   <button id="addSubBtn" data-i18n="addSubButton">
                     ➕ Add subscription
                   </button>
@@ -251,151 +255,251 @@ ss://...
                       Where to send traffic by default
                     </div>
                   </div>
-                  <div class="match-control">
-                    <label class="hint" for="matchPolicy" data-i18n="matchLabel"
-                      >Policy for the last rule</label
-                    >
-                    <select id="matchPolicy"></select>
+                  <select id="matchPolicy"></select>
+                </div>
+              </div>
+            </div>
+
+            <div class="group-card">
+              <div class="section-title">
+                <div class="section-heading">
+                  <div class="eyebrow">RULE-PROVIDERS</div>
+                  <h2 data-i18n="ruleProvidersTitle">
+                    Rule providers (RULE-SET)
+                  </h2>
+                  <div class="sub" data-i18n="ruleProvidersSub">
+                    Rule lists that can be referenced by RULE-SET rules
                   </div>
                 </div>
               </div>
 
-              <div class="rules-grid">
-                <div class="group-card rules-column">
-                  <div class="rules-head">
-                    <div class="title">
-                      <div class="eyebrow">GEOSITE</div>
-                      <h2 style="margin: 0" data-i18n="geositeTitle">
-                        Domain categories
-                      </h2>
-                      <div class="sub" data-i18n="geositeFile">
-                        File: geosite.txt
-                      </div>
-                    </div>
-                    <div
-                      class="row nowrap"
-                      style="flex: 0 0 auto; gap: 6px; align-items: center"
-                    >
-                      <button
-                        id="loadGeositeBtn"
-                        style="flex: 0 0 auto"
-                        data-i18n="geositeLoadButton"
-                      >
-                        📄 Load
-                      </button>
-                      <span class="pill" id="geositeStatus">not loaded</span>
-                    </div>
-                  </div>
-                  <div class="rules-toolbar">
-                    <div
-                      class="row between"
-                      style="align-items: flex-end; gap: 10px; flex-wrap: wrap"
-                    >
-                      <button
-                        id="geositeReset"
-                        class="ghost"
-                        style="flex: 0 0 auto"
-                        data-i18n="resetSelection"
-                      >
-                        Reset selected
-                      </button>
-                    </div>
-                    <div class="row tight between" style="align-items: center">
-                      <input
-                        id="geositeSearch"
-                        type="text"
-                        placeholder="Search GEOSITE…"
-                        data-i18n="geositeSearch"
-                        data-i18n-attr="placeholder"
-                      />
-                      <span class="pill" id="geositeCount">0</span>
-                    </div>
-                  </div>
-
-                  <div id="geositeList" class="listbox"></div>
+              <div class="rules-toolbar">
+                <div class="row">
+                  <input
+                    id="ruleProviderName"
+                    type="text"
+                    placeholder="Name, e.g. Google"
+                    data-i18n="ruleProvidersNamePlaceholder"
+                    data-i18n-attr="placeholder"
+                  />
+                  <input
+                    id="ruleProviderUrl"
+                    type="url"
+                    placeholder="URL rule-provider"
+                    data-i18n="ruleProvidersUrlPlaceholder"
+                    data-i18n-attr="placeholder"
+                  />
                 </div>
-
-                <div class="group-card rules-column">
-                  <div class="rules-head">
-                    <div class="title">
-                      <div class="eyebrow">GEOIP</div>
-                      <h2 style="margin: 0" data-i18n="geoipTitle">
-                        Countries and networks
-                      </h2>
-                      <div class="sub" data-i18n="geoipFile">
-                        File: geoip.txt
-                      </div>
-                    </div>
-                    <div
-                      class="row nowrap"
-                      style="flex: 0 0 auto; gap: 6px; align-items: center"
-                    >
-                      <button
-                        id="loadGeoipBtn"
-                        style="flex: 0 0 auto"
-                        data-i18n="geoipLoadButton"
-                      >
-                        🌍 Load
-                      </button>
-                      <span class="pill" id="geoipStatus">not loaded</span>
-                    </div>
-                  </div>
-                  <div class="rules-toolbar">
-                    <div
-                      class="row between"
-                      style="align-items: flex-end; gap: 10px; flex-wrap: wrap"
-                    >
-                      <button
-                        id="geoipReset"
-                        class="ghost"
-                        style="flex: 0 0 auto"
-                        data-i18n="resetSelection"
-                      >
-                        Reset selected
-                      </button>
-                    </div>
-                    <div class="row tight between" style="align-items: center">
-                      <input
-                        id="geoipSearch"
-                        type="text"
-                        placeholder="Search GEOIP…"
-                        data-i18n="geoipSearch"
-                        data-i18n-attr="placeholder"
-                      />
-                      <span class="pill" id="geoipCount">0</span>
-                    </div>
-                  </div>
-
-                  <div id="geoipList" class="listbox"></div>
+                <div class="row">
+                  <select id="ruleProviderBehavior">
+                    <option value="classical">classical</option>
+                    <option value="domain">domain</option>
+                    <option value="ipcidr">ipcidr</option>
+                  </select>
+                  <select id="ruleProviderPolicy"></select>
+                  <button
+                    id="addRuleProviderBtn"
+                    style="flex: 0 0 auto"
+                    data-i18n="addRuleProviderButton"
+                  >
+                    ➕ Add rule-provider
+                  </button>
                 </div>
               </div>
 
-              <div class="switch-row">
+              <div
+                id="ruleProvidersList"
+                class="listbox"
+                style="max-height: 220px"
+              ></div>
+            </div>
+
+            <div class="rules-grid">
+              <div class="group-card rules-column">
+                <div class="rules-head">
+                  <div class="title">
+                    <div class="eyebrow">GEOSITE</div>
+                    <h2 style="margin: 0" data-i18n="geositeTitle">
+                      Domain categories
+                    </h2>
+                    <div class="sub" data-i18n="geositeFile">
+                      File: geosite.txt
+                    </div>
+                  </div>
+                  <div
+                    class="row nowrap"
+                    style="flex: 0 0 auto; gap: 6px; align-items: center"
+                  >
+                    <button
+                      id="loadGeositeBtn"
+                      style="flex: 0 0 auto"
+                      data-i18n="geositeLoadButton"
+                    >
+                      📄 Load
+                    </button>
+                    <span class="pill" id="geositeStatus">not loaded</span>
+                  </div>
+                </div>
+                <div class="rules-toolbar">
+                  <div
+                    class="row between"
+                    style="align-items: flex-end; gap: 10px; flex-wrap: wrap"
+                  >
+                    <button
+                      id="geositeReset"
+                      class="ghost"
+                      style="flex: 0 0 auto"
+                      data-i18n="resetSelection"
+                    >
+                      Reset selected
+                    </button>
+                  </div>
+                  <div class="row tight between" style="align-items: center">
+                    <input
+                      id="geositeSearch"
+                      type="text"
+                      placeholder="Search GEOSITE…"
+                      data-i18n="geositeSearch"
+                      data-i18n-attr="placeholder"
+                    />
+                  </div>
+                </div>
+                <div id="geositeList" class="listbox"></div>
+                <button
+                  id="geositeShowMore"
+                  class="ghost show-more-btn"
+                  type="button"
+                  style="display: none"
+                  data-i18n="showMore"
+                >
+                  Show more
+                </button>
+              </div>
+              <div class="group-card rules-column">
+                <div class="rules-head">
+                  <div class="title">
+                    <div class="eyebrow">GEOIP</div>
+                    <h2 style="margin: 0" data-i18n="geoipTitle">
+                      Countries and networks
+                    </h2>
+                    <div class="sub" data-i18n="geoipFile">File: geoip.txt</div>
+                  </div>
+                  <div
+                    class="row nowrap"
+                    style="flex: 0 0 auto; gap: 6px; align-items: center"
+                  >
+                    <button
+                      id="loadGeoipBtn"
+                      style="flex: 0 0 auto"
+                      data-i18n="geoipLoadButton"
+                    >
+                      🌍 Load
+                    </button>
+                    <span class="pill" id="geoipStatus">not loaded</span>
+                  </div>
+                </div>
+                <div class="rules-toolbar">
+                  <div
+                    class="row between"
+                    style="align-items: flex-end; gap: 10px; flex-wrap: wrap"
+                  >
+                    <button
+                      id="geoipReset"
+                      class="ghost"
+                      style="flex: 0 0 auto"
+                      data-i18n="resetSelection"
+                    >
+                      Reset selected
+                    </button>
+                  </div>
+                  <div class="row tight between" style="align-items: center">
+                    <input
+                      id="geoipSearch"
+                      type="text"
+                      placeholder="Search GEOIP…"
+                      data-i18n="geoipSearch"
+                      data-i18n-attr="placeholder"
+                    />
+                  </div>
+                </div>
+                <div id="geoipList" class="listbox"></div>
+                <button
+                  id="geoipShowMore"
+                  class="ghost show-more-btn"
+                  type="button"
+                  style="display: none"
+                  data-i18n="showMore"
+                >
+                  Show more
+                </button>
+              </div>
+            </div>
+
+            <div class="switch-row">
+              <div>
                 <div>
-                  <div>
-                    <b data-i18n="advancedRulesTitle"
-                      >Advanced Rules + Rule-Providers (YAML)</b
-                    >
-                  </div>
-                  <div class="sub" data-i18n="advancedRulesHint">
-                    Enable to edit manually
+                  <b data-i18n="advancedRulesTitle"
+                    >Advanced Rules + Rule-Providers (YAML)</b
+                  >
+                </div>
+                <div class="sub" data-i18n="advancedRulesHint">
+                  Enable to edit manually
+                </div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="rulesAdvancedToggle" />
+                <div class="track"><div class="thumb"></div></div>
+              </label>
+            </div>
+            <textarea
+              id="rulesAdvancedText"
+              class="small"
+              spellcheck="false"
+              style="display: none"
+            ></textarea>
+
+            <div class="group-card">
+              <div class="section-title">
+                <div class="section-heading">
+                  <div class="eyebrow">MANUAL RULES</div>
+                  <h2 data-i18n="manualRulesTitle">Manual Rules</h2>
+                  <div class="sub" data-i18n="manualRulesSub">
+                    DOMAIN / IP / PROCESS rules entered by hand
                   </div>
                 </div>
-                <label class="switch">
-                  <input type="checkbox" id="rulesAdvancedToggle" />
-                  <div class="track"><div class="thumb"></div></div>
-                </label>
+                <button
+                  id="addManualRuleBtn"
+                  style="flex: 0 0 auto"
+                  data-i18n="manualRulesAddButton"
+                >
+                  ➕ Add rule
+                </button>
               </div>
-              <textarea
-                id="rulesAdvancedText"
-                class="small"
-                spellcheck="false"
-                style="display: none"
-                placeholder="rule-providers:
-   ...
- rules:
-   ..."
-              ></textarea>
+              <div class="rules-toolbar">
+                <div class="row tight between" style="align-items: center">
+                  <select id="manualRuleType">
+                    <option value="DOMAIN-SUFFIX">DOMAIN-SUFFIX</option>
+                    <option value="DOMAIN-KEYWORD">DOMAIN-KEYWORD</option>
+                    <option value="IP-CIDR">IP-CIDR</option>
+                    <option value="IP-ASN">IP-ASN</option>
+                    <option value="PROCESS-NAME">PROCESS-NAME</option>
+                    <option value="PROCESS-PATH">PROCESS-PATH</option>
+                  </select>
+                  <input
+                    id="manualRuleValue"
+                    type="text"
+                    placeholder="example.com / 192.168.0.1 / chrome.exe"
+                    data-i18n="manualRulesValuePlaceholder"
+                    data-i18n-attr="placeholder"
+                  />
+                  <select id="manualRuleAction"></select>
+                </div>
+                <div class="hint" data-i18n="manualRulesHint">
+                  Action: DIRECT / REJECT / proxy-group — e.g.
+                  PROCESS-NAME,chrome.exe,PROXY · IP-CIDR,1.2.3.4/32,DIRECT
+                </div>
+              </div>
+              <div id="manualRulesList" class="listbox"></div>
             </div>
           </div>
         </div>
@@ -414,33 +518,59 @@ ss://...
           </div>
         </div>
 
-        <div class="body">
+        <div class="body body-output">
+          <div class="output-toolbar">
+            <div class="row output-actions">
+              <button class="good" id="copyBtn" data-i18n="copyButton">
+                📋 Copy
+              </button>
+              <button id="downloadBtn" data-i18n="downloadButton">
+                💾 Download config.yaml
+              </button>
+            </div>
+          </div>
+          <div class="output-toolbar">
+            <div class="status" id="status">
+              <span class="pill">waiting</span><span id="statusText">—</span>
+            </div>
+          </div>
+          <div class="output-toolbar">
+            <div class="group-card">
+              <div class="section-title">
+                <div class="section-heading">
+                  <div class="eyebrow" data-i18n="ruleOrderEyebrow">
+                    RULE PRIORITY
+                  </div>
+                  <h2 style="margin: 0" data-i18n="ruleOrderTitle">
+                    Rule order
+                  </h2>
+                  <div class="sub" data-i18n="ruleOrderSub">
+                    Higher rules are matched first
+                  </div>
+                </div>
+              </div>
+              <div
+                id="rulesOrderList"
+                class="listbox"
+                style="max-height: 220px"
+              ></div>
+            </div>
+          </div>
           <pre id="output" data-placeholder="true"></pre>
-
-          <div class="row">
-            <button class="good" id="copyBtn" data-i18n="copyButton">
-              📋 Copy
-            </button>
-            <button id="downloadBtn" data-i18n="downloadButton">
-              💾 Download config.yaml
-            </button>
-          </div>
-
-          <div class="status" id="status">
-            <span class="pill">waiting</span><span id="statusText">—</span>
-          </div>
-        </div>
-
-        <div class="footer">
-          <div data-i18n="footerHint">Ctrl/Cmd + Enter — build.</div>
         </div>
       </section>
     </div>
-    <script src="languages/en.js"></script>
-    <script src="languages/zh.js"></script>
-    <script src="languages/fa.js"></script>
-    <script src="languages/ru.js"></script>
-    <script src="scripts/app.js"></script>
-    <script src="scripts/parser.js"></script>
+
+    <script
+      src="https://unpkg.com/twemoji@14.0.2/dist/twemoji.min.js"
+      crossorigin="anonymous"
+      defer
+    ></script>
+    <script src="scripts/languages/en.js" defer></script>
+    <script src="scripts/languages/zh.js" defer></script>
+    <script src="scripts/languages/fa.js" defer></script>
+    <script src="scripts/languages/ru.js" defer></script>
+    <script src="scripts/app.js" defer></script>
+    <script src="scripts/parser.js" defer></script>
   </body>
 </html>

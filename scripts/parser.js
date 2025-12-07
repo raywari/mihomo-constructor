@@ -33,8 +33,8 @@
       /([\uD800-\uDBFF](?![\uDC00-\uDFFF]))|((?<![\uD800-\uDBFF])[\uDC00-\uDFFF])/g,
       ""
     );
-    s = s.replace(/[\u0000-\u001F\u007F-\u009F]/g, ""); // control chars
-    s = s.replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, ""); // bidi marks
+    s = s.replace(/[\u0000-\u001F\u007F-\u009F]/g, "");
+    s = s.replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, "");
     s = s.replace(/[\uFE00-\uFE0F]/g, "");
     s = s.replace(/\s+/g, " ").trim();
     if (s.length > 120) s = s.slice(0, 120);
@@ -91,7 +91,7 @@
           }
         }
 
-        if (start === -1) break; // в этом куске больше схем нет
+        if (start === -1) break;
         found = true;
         let end = text.length;
         for (const s of schemes) {
@@ -444,7 +444,7 @@
     const hostStr = String(host || "").trim();
     const badHost =
       !hostStr ||
-      /["',\s]/.test(hostStr) || // кавычки/запятые/пробелы = точно мусор
+      /["',\s]/.test(hostStr) ||
       hostStr.includes("{") ||
       hostStr.includes("}") ||
       hostStr.includes("\\") ||
@@ -575,84 +575,84 @@
     return p;
   }
 
-function parseHy(u, hy2 = false) {
-  const q = parsedQs(u);
-  const name = getNameFromFragmentOrHost(u, hy2 ? "hysteria2" : "hysteria");
-  const host = normalizeHostname(u.hostname);
+  function parseHy(u, hy2 = false) {
+    const q = parsedQs(u);
+    const name = getNameFromFragmentOrHost(u, hy2 ? "hysteria2" : "hysteria");
+    const host = normalizeHostname(u.hostname);
 
-  const p = {
-    name: sanitizeString(name, host || (hy2 ? "hy2" : "hy")),
-    type: hy2 ? "hysteria2" : "hysteria",
-    server: host,
-    port: u.port ? Number(u.port) : null,
-    udp: true,
-  };
+    const p = {
+      name: sanitizeString(name, host || (hy2 ? "hy2" : "hy")),
+      type: hy2 ? "hysteria2" : "hysteria",
+      server: host,
+      port: u.port ? Number(u.port) : null,
+      udp: true,
+    };
 
-  if (hy2) {
-    p.password = sanitizeString(stripControlChars(u.username || ""), "");
-    const obfsTypeRaw = q.obfs || q["obfs-type"] || q.obfsType || "";
-    const obfsPassRaw =
-      q["obfs-password"] || q.obfsPassword || q["obfsPassword"] || "";
+    if (hy2) {
+      p.password = sanitizeString(stripControlChars(u.username || ""), "");
+      const obfsTypeRaw = q.obfs || q["obfs-type"] || q.obfsType || "";
+      const obfsPassRaw =
+        q["obfs-password"] || q.obfsPassword || q["obfsPassword"] || "";
 
-    const obfsType = sanitizeString(obfsTypeRaw, "").toLowerCase();
-    const obfsPass = sanitizeString(obfsPassRaw, "");
+      const obfsType = sanitizeString(obfsTypeRaw, "").toLowerCase();
+      const obfsPass = sanitizeString(obfsPassRaw, "");
 
-    if (obfsType && obfsType !== "plain") {
-      if (obfsPass) {
-        p.obfs = "salamander";          // нормализуем
-        p["obfs-password"] = obfsPass; // обязателен
+      if (obfsType && obfsType !== "plain") {
+        if (obfsPass) {
+          p.obfs = "salamander";
+          p["obfs-password"] = obfsPass;
+        }
+      }
+      const hasObfsTypeExplicit =
+        "obfs" in q || "obfs-type" in q || "obfsType" in q;
+      if (!hasObfsTypeExplicit) {
+        delete p.obfs;
+        delete p["obfs-password"];
+      }
+      if (p.obfs && !obfsPass) {
+        delete p.obfs;
+        delete p["obfs-password"];
+      }
+    } else {
+      p.auth = sanitizeString(q.auth || "", "");
+      if ("insecure" in q)
+        p.insecure =
+          q.insecure === "1" || q.insecure === "true" || q.insecure === "True";
+      if ("upmbps" in q)
+        p["up-mbps"] = /^\d+$/.test(q.upmbps) ? Number(q.upmbps) : q.upmbps;
+      if ("downmbps" in q)
+        p["down-mbps"] = /^\d+$/.test(q.downmbps)
+          ? Number(q.downmbps)
+          : q.downmbps;
+      const obfsTypeRaw = q.obfs || q["obfs-type"] || q.obfsType || "";
+      const obfsPassRaw =
+        q["obfs-password"] || q.obfsPassword || q["obfsPassword"] || "";
+
+      const obfsType = sanitizeString(obfsTypeRaw, "").toLowerCase();
+      const obfsPass = sanitizeString(obfsPassRaw, "");
+
+      if (obfsType && obfsType !== "plain") {
+        if (obfsPass) {
+          p.obfs = obfsType;
+          p["obfs-password"] = obfsPass;
+        }
       }
     }
-    const hasObfsTypeExplicit =
-      ("obfs" in q) || ("obfs-type" in q) || ("obfsType" in q);
-    if (!hasObfsTypeExplicit) {
-      delete p.obfs;
-      delete p["obfs-password"];
-    }
-    if (p.obfs && !obfsPass) {
-      delete p.obfs;
-      delete p["obfs-password"];
-    }
-  } else {
-    p.auth = sanitizeString(q.auth || "", "");
-    if ("insecure" in q)
-      p.insecure =
-        q.insecure === "1" || q.insecure === "true" || q.insecure === "True";
-    if ("upmbps" in q)
-      p["up-mbps"] = /^\d+$/.test(q.upmbps) ? Number(q.upmbps) : q.upmbps;
-    if ("downmbps" in q)
-      p["down-mbps"] = /^\d+$/.test(q.downmbps)
-        ? Number(q.downmbps)
-        : q.downmbps;
-    const obfsTypeRaw = q.obfs || q["obfs-type"] || q.obfsType || "";
-    const obfsPassRaw =
-      q["obfs-password"] || q.obfsPassword || q["obfsPassword"] || "";
 
-    const obfsType = sanitizeString(obfsTypeRaw, "").toLowerCase();
-    const obfsPass = sanitizeString(obfsPassRaw, "");
+    if (q.alpn)
+      p.alpn = q.alpn
+        .split(",")
+        .map((x) => sanitizeString(x.trim(), ""))
+        .filter(Boolean);
 
-    if (obfsType && obfsType !== "plain") {
-      if (obfsPass) {
-        p.obfs = obfsType;
-        p["obfs-password"] = obfsPass;
-      }
-    }
+    if (q.sni) p.servername = sanitizeString(q.sni, "");
+    p.name = sanitizeString(p.name, p.server || "proxy");
+    if (p.password) p.password = sanitizeString(p.password, "");
+    if (p.auth) p.auth = sanitizeString(p.auth, "");
+    if (p.servername) p.servername = sanitizeString(p.servername, "");
+
+    return p;
   }
-
-  if (q.alpn)
-    p.alpn = q.alpn
-      .split(",")
-      .map((x) => sanitizeString(x.trim(), ""))
-      .filter(Boolean);
-
-  if (q.sni) p.servername = sanitizeString(q.sni, "");
-  p.name = sanitizeString(p.name, p.server || "proxy");
-  if (p.password) p.password = sanitizeString(p.password, "");
-  if (p.auth) p.auth = sanitizeString(p.auth, "");
-  if (p.servername) p.servername = sanitizeString(p.servername, "");
-
-  return p;
-}
 
   function parseTuic(u) {
     const q = parsedQs(u);
@@ -757,7 +757,7 @@ function parseHy(u, hy2 = false) {
       protocol,
       obfs,
       "protocol-param": protoParam || undefined,
-      "obfs-param": obfsParam || undefined, // если obfsParam пустой — ключ пропадёт
+      "obfs-param": obfsParam || undefined,
       udp: true,
     };
   }
@@ -815,7 +815,7 @@ function parseHy(u, hy2 = false) {
     for (const u of urls) {
       try {
         const p = parseOne(u);
-        if (p) proxies.push(p); // на будущее: если parseOne где-то вернет null
+        if (p) proxies.push(p);
       } catch (err) {
         if (collectErrors) {
           errors.push({
