@@ -47,7 +47,7 @@ export function loadGeo(kind) {
   stateArr.length = 0;
   statusEl.textContent = t("loadingShort");
 
-  const worker = new Worker("./geo-worker.js");
+  const worker = new Worker(new URL("./geo-worker.js", import.meta.url))
 
   worker.onmessage = ({ data }) => {
     if (data.type === "chunk") {

@@ -1,5 +1,5 @@
-export const GEOSITE_URL = "./geo/geosite.txt";
-export const GEOIP_URL = "./geo/geoip.txt";
+export const GEOSITE_URL = new URL("../geo/geosite.txt", import.meta.url).href;
+export const GEOIP_URL = new URL("../geo/geoip.txt", import.meta.url).href;
 export const MATCH_AUTO_VALUE = "__auto__";
 export const AUTO_GROUP_NAME = "auto";
 
